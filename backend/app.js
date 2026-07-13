@@ -14,6 +14,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// BULUT POSTGRESQL BAĞLANTI HAVUZU
 const pool = new pg.Pool({
     connectionString: process.env.DATABASE_URL || process.env.MONGODB_URI,
     ssl: { rejectUnauthorized: false }
@@ -21,6 +22,7 @@ const pool = new pg.Pool({
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "SAHTE_KEY" });
 
+// TABLOLARI HAZIRLA
 async function tabloyuHazirla() {
     try {
         await pool.query(`
@@ -57,10 +59,11 @@ function slugify(text) {
     return text.toString().toLowerCase().trim().replace(/[çğşüıöÇĞŞÜİÖ]/g, match => trMap[match]).replace(/[^a-z0-9 -]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-');
 }
 
+// İŞLETME KAYIT
 app.post('/api/register-business', async (req, res) => {
     try {
         const companyName = req.body.name || req.body.companyName;
-        const sectorType = req.body.sector || req.body.sectorType || "Hizmet Sektörü";
+        const sectorType = req.body.sector || req.body.sectorType || "Berber / Erkek Kuaförü";
         const phone = req.body.phone || "05550000000";
 
         if (!companyName) return res.status(400).json({ success: false, message: "İşletme adı boş bırakılamaz." });
@@ -82,7 +85,7 @@ app.post('/api/register-business', async (req, res) => {
     }
 });
 
-// API: DÜKKAN DETAYI SORGULAMA (Arayüze Dizi Yerine Direkt Tek Nesne Gönderen Kritik Alan)
+// API: DÜKKAN DETAYI SORGULAMA (Arayüzün Tam Beklediği Formata Çeken Kritik Bölge)
 app.get('/api/dukkan-detay/:slug', async (req, res) => {
     try {
         const dukkanSlug = req.params.slug;
@@ -94,9 +97,10 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
 
         const randevularSorgu = await pool.query("SELECT id, musteri_adi, randevu_tarihi, randevu_saati FROM randevular WHERE TRIM(LOWER(dukkan_slug)) = TRIM(LOWER($1)) AND durum = 'AKTIF' ORDER BY id DESC", [dukkanSlug]);
         
+        // 💡 KİLİT ÇÖZÜM: Sorgu dizisindeki ilk elemanı (.rows[0]) doğrudan nesne olarak ayırıp gönderiyoruz!
         res.json({
             success: true,
-            dukkan: dukkanSorgu.rows[0], // 💡 Dizi içindeki ilk elemanı doğrudan nesne olarak çıkartıp gönderiyoruz!
+            dukkan: dukkanSorgu.rows[0], 
             randevular: randevularSorgu.rows
         });
     } catch (error) {
@@ -132,7 +136,7 @@ app.post('/api/cancel-appointment', async (req, res) => {
         try {
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
-                contents: `Bir kuaför dükkanında ${iptalEdilen.randevu_tarihi} tarihinde saat ${iptalEdilen.randevu_saati} koltuğu az önce iptal edilerek boşaldı. Sırada bekleyen diğer müşterilere gönderilmek üzere, onları dükkana davet eden, yapay zeka sıcaklığında, samimi, aciliyet hissi uyandıran Türkçe bir WhatsApp kurtarma mesajı write. Esnaf dili kullan, emoji ekle. Sadece gönderilecek mesaj metnini dön.`,
+                contents: `Bir kuaför dükkanında ${iptalEdilen.randevu_tarihi} tarihinde saat ${iptalEdilen.randevu_saati} koltuğu az önce iptal edilerek boşaldı. Sırada bekleyen diğer müşterilere gönderilmek üzere, onları dükkana davet eden, yapay zeka sıcaklığında, samimi, aciliyet hissi uyandıran Türkçe bir WhatsApp kurtarma mesajı yaz. Esnaf dili kullan, emoji ekle. Sadece gönderilecek mesaj metnini dön.`,
             });
             aiMesaj = response.text || aiMesaj;
         } catch (aiErr) {
@@ -152,6 +156,7 @@ app.get('/:slug', (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} üzerinde yayında.`));
+
 
 
 
