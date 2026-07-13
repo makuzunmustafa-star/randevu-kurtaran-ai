@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const app = express();
-const PORT = process.env.PORT || 10000; // Render için varsayılan port
+const PORT = process.env.PORT || 10000;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,10 +16,13 @@ app.use(express.urlencoded({ extended: true }));
 // Frontend dosyalarına doğrudan erişim izni
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 2. BULUT VERİ TABANI BAĞLANTISI (PostgreSQL)
+// 2. BULUT VERİ TABANI BAĞLANTISI (Gelişmiş Güvenlik ve Hata Geçirmez Havuz)
 const pool = new pg.Pool({
-    connectionString: process.env.MONGODB_URI,
-    ssl: { rejectUnauthorized: false } // Bulut güvenliği için zorunlu ayar
+    connectionString: process.env.DATABASE_URL || process.env.MONGODB_URI,
+    ssl: { rejectUnauthorized: false }, // Bulut güvenliği için zorunlu ayar
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000
 });
 
 // Otomatik tablo oluşturma kontrolü
@@ -55,10 +58,9 @@ function slugify(text) {
         .replace(/-+/g, '-');
 }
 
-// 4. ORTAK KAYIT İŞLEYİCİ FONKSİYON (NOT FOUND HATASINI BİTİREN KISIM)
+// 4. ORTAK KAYIT İŞLEYİCİ FONKSİYON
 async function kayitIsleyici(req, res) {
     try {
-        // Arayüzden gelebilecek tüm muhtemel değişken isimlerini eşliyoruz
         const companyName = req.body.companyName || req.body.name || req.body.businessName;
         const sectorType = req.body.sectorType || req.body.sector || req.body.type;
         const phone = req.body.phone || req.body.tel;
@@ -93,18 +95,17 @@ async function kayitIsleyici(req, res) {
     }
 }
 
-// 5. TÜM ALTERNATİF ROTALARI TEK MERKEZE BAĞLIYORUZ (NOT FOUND SON BULUYOR)
+// 5. TÜM ALTERNATİF POST ROTALARI
 app.post('/api/register-business', kayitIsleyici);
 app.post('/api/register', kayitIsleyici);
 app.post('/api/business', kayitIsleyici);
 app.post('/register', kayitIsleyici);
 
-// 6. DİNAMİK MÜŞTERİ RANDEVU SAYFASI (GET RROTASI)
+// 6. DİNAMİK MÜŞTERİ RANDEVU SAYFASI (GET ROTASI)
 app.get('/:slug', async (req, res) => {
     try {
         const dukkanSlug = req.params.slug;
         
-        // Eğer yanlışlıkla alt dosya istekleri buraya düşerse engelle
         if (dukkanSlug.includes('.') || dukkanSlug === 'favicon.ico') return;
 
         const dukkanSorgu = await pool.query('SELECT * FROM dukkanlar WHERE slug = $1', [dukkanSlug]);
@@ -159,4 +160,5 @@ app.get('/:slug', async (req, res) => {
 app.listen(PORT, () => {
     console.log(`🚀 Sunucu ${PORT} portunda başarıyla ayağa kalktı.`);
 });
+
 
