@@ -58,16 +58,15 @@
 <script>
     let selectedTimeSlot = "";
     const slug = window.location.pathname.split('/').pop();
-    const currentOrigin = window.location.origin; // Canlı sitenin tam adres kökünü yakalar
+    const currentOrigin = window.location.origin;
 
-    // Verileri API'den güvenle çekme
     async function verileriGetir() {
         try {
-            // İstek yolunu tam canlı URL origin ile besleyerek bağlantı sorununu çözüyoruz!
             const res = await fetch(`${currentOrigin}/api/dukkan-detay/${slug}`);
             const data = await res.json();
             if (!data.success) { document.body.innerHTML = '<h1 style="text-align:center;margin-top:100px;">❌ İşletme Bulunamadı</h1>'; return; }
             
+            // 💡 ARTIK HATA VERMEZ: Gelen saf nesneyi kilitlenmeden doğrudan okuyoruz!
             document.getElementById('dukkanAdi').innerText = "💈 " + data.dukkan.name;
             document.getElementById('dukkanSektor').innerText = data.dukkan.sector;
             
