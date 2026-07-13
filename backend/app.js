@@ -82,7 +82,7 @@ app.post('/api/register-business', async (req, res) => {
     }
 });
 
-// API: DÜKKAN VE RANDEVU DETAYLARINI DÜZGÜN VERI YAPISINDA GETİRME
+// API: DÜKKAN DETAYI SORGULAMA (💡 Arayüze Liste Değerini Saf Tek Bir Nesne Olarak İndirgeyip Gönderen Düzeltme)
 app.get('/api/dukkan-detay/:slug', async (req, res) => {
     try {
         const dukkanSlug = req.params.slug;
@@ -94,7 +94,7 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
 
         const randevularSorgu = await pool.query("SELECT id, musteri_adi, randevu_tarihi, randevu_saati FROM randevular WHERE TRIM(LOWER(dukkan_slug)) = TRIM(LOWER($1)) AND durum = 'AKTIF' ORDER BY id DESC", [dukkanSlug]);
         
-        // rows[0] diyerek dizinin ilk elemanını saf nesne yapıp arayüze teslim ediyoruz!
+        // rows[0] mühürlemesi ile dizinin ilk dükkanını doğrudan tek nesne olarak arayüze teslim ediyoruz!
         res.json({
             success: true,
             dukkan: dukkanSorgu.rows[0], 
@@ -139,7 +139,6 @@ app.post('/api/cancel-appointment', async (req, res) => {
     }
 });
 
-// STATİK RANDEVU SAYFASINA YÖNLENDİRME
 app.get('/:slug', (req, res) => {
     const dukkanSlug = req.params.slug;
     if (dukkanSlug.includes('.') || dukkanSlug === 'favicon.ico') return;
