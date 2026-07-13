@@ -53,42 +53,71 @@ async function tabloyuHazirla() {
 }
 tabloyuHazirla();
 
+// GÜVENLİ SLUG FONKSİYONU
 function slugify(text) {
+    if (!text) return 'isletme-' + Math.floor(1000 + Math.random() * 9000);
     const trMap = { 'ç': 'c', 'Ç': 'c', 'ğ': 'g', 'Ğ': 'g', 'ş': 's', 'Ş': 's', 'ü': 'u', 'Ü': 'u', 'ı': 'i', 'İ': 'i', 'ö': 'o', 'Ö': 'o' };
     return text.toString().toLowerCase().trim().replace(/[çğşüıöÇĞŞÜİÖ]/g, match => trMap[match]).replace(/[^a-z0-9 -]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-');
 }
 
-// İŞLETME KAYIT ROTALARI
-async function kayitIsleyici(req, res) {
+// PARAMETRE GEÇİRMEZ GÜVENLİ KAYIT İŞLEYİCİ (KİLİT ÇÖZÜM!)
+app.post('/api/register-business', async (req, res) => {
     try {
-        const companyName = req.body.companyName || req.body.name;
-        const sectorType = req.body.sectorType || req.body.sector;
-        const phone = req.body.phone;
-        if (!companyName || !sectorType || !phone) return res.status(400).json({ success: false, message: "Eksik alan var." });
-        let generatedSlug = slugify(companyName);
-        const mevcutDukkan = await pool.query('SELECT id FROM dukkanlar WHERE slug = $1', [generatedSlug]);
-        if (mevcutDukkan.rows.length > 0) generatedSlug = `${generatedSlug}-${Math.floor(1000 + Math.random() * 9000)}`;
-        await pool.query('INSERT INTO dukkanlar (name, sector, phone, slug) VALUES ($1, $2, $3, $4)', [companyName, sectorType, phone, generatedSlug]);
-        res.json({ success: true, slug: generatedSlug });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Hata oluştu." });
-    }
-}
-app.post('/api/register-business', kayitIsleyici);
-app.post('/api/register', kayitIsleyici);
+        console.log("📥 Gelen Ham Kayıt Verisi:", req.body);
+        
+        // Arayüzden gelebilecek tüm muhtemel alternatif isimleri tek merkezde eşitliyoruz
+        const companyName = req.body.name || req.body.companyName || req.body.businessName;
+        const sectorType = req.body.sector || req.body.sectorType || req.body.type || "Hizmet Sektörü";
+        const phone = req.body.phone || req.body.phoneNum || "05550000000";
 
-// API: DÜKKAN BİLGİLERİNİ VE AKTİF RANDEVULARINI GETİRME (KİLİT ÇÖZÜM!)
+        if (!companyName) {
+            return res.status(400).json({ success: false, message: "İşletme adı boş bırakılamaz." });
+        }
+
+        let generatedSlug = slugify(companyName);
+
+        // Çakışma kontrolü
+        const mevcutDukkan = await pool.query('SELECT id FROM dukkanlar WHERE slug = $1', [generatedSlug]);
+        if (mevcutDukkan.rows.length > 0) {
+            generatedSlug = `${generatedSlug}-${Math.floor(1000 + Math.random() * 9000)}`;
+        }
+
+        // Veri tabanına mühürleme
+        await pool.query(
+            'INSERT INTO dukkanlar (name, sector, phone, slug) VALUES ($1, $2, $3, $4)',
+            [companyName, sectorType, phone, generatedSlug]
+        );
+
+        console.log(`🚀 Veritabanına Başarıyla Mühürlendi: ${companyName} (${generatedSlug})`);
+        return res.json({ success: true, slug: generatedSlug });
+
+    } catch (error) {
+        console.error('❌ Veritabanı Kayıt Hatası:', error);
+        return res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ALTERNATİF ROTALAR
+app.post('/api/register', (req, res) => res.redirect(307, '/api/register-business'));
+app.post('/register', (req, res) => res.redirect(307, '/api/register-business'));
+
+// API: DÜKKAN VE RANDEVU DETAYLARINI GETİRME (BÜYÜK BÜTÜNLÜK)
 app.get('/api/dukkan-detay/:slug', async (req, res) => {
     try {
         const dukkanSlug = req.params.slug;
-        const dukkanSorgu = await pool.query('SELECT * FROM dukkanlar WHERE slug = $1', [dukkanSlug]);
-        if (dukkanSorgu.rows.length === 0) return res.status(404).json({ success: false, message: "İşletme bulunamadı." });
+        
+        // Veritabanında tam küçük harf ve boşluksuz eşleşme kontrolü
+        const dukkanSorgu = await pool.query("SELECT name, sector, phone, slug FROM dukkanlar WHERE TRIM(LOWER(slug)) = TRIM(LOWER($1))", [dukkanSlug]);
+        
+        if (dukkanSorgu.rows.length === 0) {
+            return res.status(404).json({ success: false, message: "İşletme veri tabanında bulunamadı." });
+        }
 
         const randevularSorgu = await pool.query("SELECT id, musteri_adi, randevu_tarihi, randevu_saati FROM randevular WHERE TRIM(LOWER(dukkan_slug)) = TRIM(LOWER($1)) AND durum = 'AKTIF' ORDER BY id DESC", [dukkanSlug]);
         
         res.json({
             success: true,
-            dukkan: dukkanSorgu.rows[0],
+            dukkan: dukkanSorgu.rows[0], // İlk dükkanı nesne olarak gönderiyoruz
             randevular: randevularSorgu.rows
         });
     } catch (error) {
@@ -96,7 +125,7 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
     }
 });
 
-// API: RANDEVU KAYDETME ROTASI
+// API: RANDEVU KAYDETME
 app.post('/api/book-appointment', async (req, res) => {
     try {
         const { dukkanSlug, musteriAdi, randevuTarihi, randevuSaati } = req.body;
@@ -104,7 +133,7 @@ app.post('/api/book-appointment', async (req, res) => {
             return res.status(400).json({ success: false, message: "Lütfen tüm seçimleri yapın." });
         }
         const cakismaKontrol = await pool.query(
-            'SELECT id FROM randevular WHERE dukkan_slug = $1 AND randevu_tarihi = $2 AND randevu_saati = $3 AND durum = \'AKTIF\'',
+            "SELECT id FROM randevular WHERE TRIM(LOWER(dukkan_slug)) = TRIM(LOWER($1)) AND randevu_tarihi = $2 AND randevu_saati = $3 AND durum = 'AKTIF'",
             [dukkanSlug, randevuTarihi, randevuSaati]
         );
         if (cakismaKontrol.rows.length > 0) {
@@ -112,7 +141,7 @@ app.post('/api/book-appointment', async (req, res) => {
         }
         await pool.query(
             'INSERT INTO randevular (dukkan_slug, musteri_adi, randevu_tarihi, randevu_saati) VALUES ($1, $2, $3, $4)',
-            [dukkanSlug, musteriAdi, randevuTarihi, randevuSaati]
+            [dukkanSlug.trim().toLowerCase(), musteriAdi, randevuTarihi, randevuSaati]
         );
         res.json({ success: true, message: "🎉 Randevunuz başarıyla alındı! Yapay zeka koltuğunuzu ayırdı." });
     } catch (error) {
@@ -120,7 +149,7 @@ app.post('/api/book-appointment', async (req, res) => {
     }
 });
 
-// API: YAPAY ZEKA İPTAL MOTORU ROTASI
+// API: YAPAY ZEKA İPTAL MOTORU
 app.post('/api/cancel-appointment', async (req, res) => {
     try {
         const { randevuId } = req.body;
@@ -143,7 +172,7 @@ app.post('/api/cancel-appointment', async (req, res) => {
 
         res.json({ 
             success: true, 
-            message: `⚠️ Randevu iptal edildi. Yapay zeka boşalan ${iptalEdilen.randevu_saati} koltuğunu kurtarmak için akıllı davet mesajını üretti ve sıradaki müşterilere WhatsApp kuyruğunu başlattı!`,
+            message: `⚠️ Randevu iptal edildi. Yapay zeka boşalan ${iptalEdilen.randevu_saati} koltuğunu kurtarmak için akıllı davet mesajını üretti!`,
             aiGeneratedMessage: aiMesaj
         });
     } catch (error) {
@@ -151,7 +180,7 @@ app.post('/api/cancel-appointment', async (req, res) => {
     }
 });
 
-// DÜKKAN SAYFASINI STATİK HTML DOSYASINA YÖNLENDİR (TIRNAK ÇAKIŞMALARINI YOK EDEN KISIM)
+// STATİK YÖNLENDİRME
 app.get('/:slug', (req, res) => {
     const dukkanSlug = req.params.slug;
     if (dukkanSlug.includes('.') || dukkanSlug === 'favicon.ico') return;
@@ -159,5 +188,6 @@ app.get('/:slug', (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} üzerinde yayında.`));
+
 
 
