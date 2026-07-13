@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Randevu Kurtaran - Kurumsal İşletme Kayıt Paneli</title>
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .card { background: #1e293b; padding: 40px; border-radius: 20px; border: 1px solid #334155; width: 100%; max-width: 450px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.4); }
+        .logo-area { text-align: center; margin-bottom: 24px; font-size: 28px; font-weight: 800; color: #38bdf8; letter-spacing: -0.5px; }
+        h2 { margin-top: 0; color: #f1f5f9; font-size: 22px; font-weight: 700; text-align: center; margin-bottom: 6px; }
+        p { text-align: center; color: #94a3b8; font-size: 14px; margin-top: 0; margin-bottom: 24px; }
+        .badge-trial { display: block; text-align: center; color: #34d399; font-size: 13px; font-weight: 600; margin-bottom: 24px; background: rgba(52, 211, 153, 0.1); padding: 8px; border-radius: 10px; border: 1px solid rgba(52, 211, 153, 0.2); }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-size: 14px; color: #94a3b8; margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        input, select { width: 100%; padding: 12px 14px; background: #0f172a; border: 1px solid #334155; border-radius: 10px; color: #f8fafc; font-size: 14px; box-sizing: border-box; }
+        input:focus, select:focus { outline: none; border-color: #38bdf8; }
+        button { width: 100%; padding: 14px; background: #38bdf8; color: #0f172a; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; margin-top: 10px; }
+        button:hover { background: #0ea5e9; transform: translateY(-1px); }
+        #message { margin-top: 20px; padding: 14px; border-radius: 10px; font-size: 14px; display: none; text-align: center; font-weight: 600; line-height: 1.5; }
+        .success-msg { background: rgba(52, 211, 153, 0.1); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.2); }
+        .error-msg { background: rgba(248, 113, 113, 0.1); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.2); }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div class="logo-area">🗓️ Randevu Kurtaran</div>
+    <h2>İşletmenizi Dijitale Taşıyın</h2>
+    <p>Yapay zeka destekli akıllı randevu ve iptal kurtarma sistemine ilk adımı atın.</p>
+    
+    <div class="badge-trial">🎁 Şimdi Katılın: 7 Günlük Koşulsuz Ücretsiz Deneme (0 TL)</div>
+    
+    <form id="kurumsalKayıtForm">
+        <div class="form-group">
+            <label>Şirket / Ticari İşletme Adı</label>
+            <input type="text" id="isletmeAdi" placeholder="Örn: Star Berber Salonu" required>
+        </div>
+        <div class="form-group">
+            <label>Sektör Tipi</label>
+            <select id="sektor" required>
+                <option value="Berber / Erkek Kuaförü">Berber / Erkek Kuaförü</option>
+                <option value="Güzellik & Saç Salonu">Güzellik & Saç Salonu</option>
+                <option value="Klinik / Doktor Muayenehanesi">Klinik / Doktor Muayenehanesi</option>
+                <option value="Oto Servis / Araç Kiralama">Oto Servis / Araç Kiralama</option>
+                <option value="Diğer Ticari Hizmetler">Diğer Ticari Hizmetler</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Yönetici Telefon Numarası</label>
+            <input type="tel" id="telefon" placeholder="Örn: 05551234567" required>
+        </div>
+        <button type="submit">7 Günlük Ücretsiz Denemeyi Başlat</button>
+    </form>
+    <div id="message"></div>
+</div>
+
+<script>
+    document.getElementById('kurumsalKayıtForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const btn = e.target.querySelector('button');
+        const msgDiv = document.getElementById('message');
+        
+        btn.innerText = "Kurumsal Hesabınız Oluşturuluyor...";
+        btn.disabled = true;
+        msgDiv.style.display = "none";
+
+        const formData = {
+            isim: document.getElementById('isletmeAdi').value + " (" + document.getElementById('sektor').value + ")",
+            telefon: document.getElementById('telefon').value,
+            tarih: "KURUMSAL_KAYIT",
+            saat: "YENİ_İŞLETME"
+        };
+
+        try {
+            // MUTLAK KESİN ÇÖZÜM: Baştaki internet adresini tamamen sildik. Sadece iç tünel rotasını bıraktık.
+            const response = await fetch('/api/randevu', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                const slug = document.getElementById('isletmeAdi').value.toLowerCase().replace(/[^a-z0-9]/g, '-');
+                msgDiv.className = "success-msg";
+                msgDiv.innerHTML = `🎉 <b>Tebrikler! Kurumsal kaydınız başarıyla tamamlandı.</b><br><br>👉 <b>Müşteri Randevu Linkiniz:</b><br><span style="color:#38bdf8;">https://onrender.com{slug}</span><br><br>Yönetim paneline geçmek için sol üstteki linki kullanabilirsiniz.`;
+            } else {
+                msgDiv.className = "error-msg";
+                msgDiv.innerText = data.message;
+            }
+        } catch (error) {
+            msgDiv.className = "error-msg";
+            msgDiv.innerText = "Sistem bağlantı hatası! Lütfen daha sonra tekrar deneyin.";
+        }
+
+        msgDiv.style.display = "block";
+        btn.innerText = "7 Günlük Ücretsiz Denemeyi Başlat";
+        btn.disabled = false;
+    });
+</script>
+</body>
+</html>
