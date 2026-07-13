@@ -1,89 +1,162 @@
 import express from 'express';
-import cors from 'cors';
+import pg from 'pg';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import Iyzipay from 'iyzipay';
-import dotenv from 'dotenv';
-
-// Canlı ortam çevre değişkenlerini yüklüyoruz
-dotenv.config();
 
 const app = express();
-// ÇÖZÜM: Canlı sunucularda (Vercel/Heroku) port dinamik gelir. Yoksa 3000 portunu kullanır.
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000; // Render için varsayılan port
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-app.use(cors());
+// 1. GEREKLİ ARA YAZILIMLAR (MIDDLEWARE)
 app.use(express.json());
-app.use(express.static(__dirname));
+app.use(express.urlencoded({ extended: true }));
 
-// Canlı ortamda gerçek anahtarlar, yerelde sandbox anahtarları kullanılır
-const iyzipay = new Iyzipay({
-    apiKey: process.env.IYZIPAY_API_KEY || 'sandbox-vM9X3U7G6o2mK4Lp1s8v9B3n5m',
-    secretKey: process.env.IYZIPAY_SECRET_KEY || 'sandbox-secret-kEy7u8i9o0p1234567',
-    uri: process.env.IYZIPAY_URI || 'https://iyzipay.com'
+// Frontend dosyalarına doğrudan erişim izni
+app.use(express.static(path.join(__dirname, 'public')));
+
+// 2. BULUT VERİ TABANI BAĞLANTISI (PostgreSQL)
+const pool = new pg.Pool({
+    connectionString: process.env.MONGODB_URI,
+    ssl: { rejectUnauthorized: false } // Bulut güvenliği için zorunlu ayar
 });
 
-// Sistem Belleğindeki Global Veri Havuzu
-const randevuVeritabani = [
-    { id: 'RND97865', isim: 'Ahmet Yılmaz', telefon: '05551234567', tarih: '2026-07-15', saat: '14:00', durum: 'Onaylandı', tutar: 250, paymentTransactionId: 'TX123456' }
-];
+// Otomatik tablo oluşturma kontrolü
+async function tabloyuHazirla() {
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS dukkanlar (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                sector VARCHAR(255) NOT NULL,
+                phone VARCHAR(255) NOT NULL,
+                slug VARCHAR(255) UNIQUE NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        console.log('✅ PostgreSQL Dükkanlar Tablosu Hazır.');
+    } catch (err) {
+        console.error('❌ Tablo oluşturma hatası:', err);
+    }
+}
+tabloyuHazirla();
 
-// STATİK ROTALAR
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'odeme.html')));
-app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
-
-// 1. Randevu ve Ödeme API Noktası
-app.post('/api/randevu', (req, res) => {
-    const { isim, telefon, tarih, saat } = req.body;
-    const randevuId = 'RND' + Math.floor(Math.random() * 100000);
-    const txId = 'TX' + Math.floor(Math.random() * 1000000);
-
-    const yeniKayıt = {
-        id: randevuId, isim, telefon, tarih, saat,
-        durum: 'Onaylandı', tutar: 250, paymentTransactionId: txId
+// 3. URL DOSTU SLUG OLUŞTURMA FONKSİYONU
+function slugify(text) {
+    const trMap = {
+        'ç': 'c', 'Ç': 'c', 'ğ': 'g', 'Ğ': 'g', 'ş': 's', 'Ş': 's',
+        'ü': 'u', 'Ü': 'u', 'ı': 'i', 'İ': 'i', 'ö': 'o', 'Ö': 'o'
     };
+    return text.toString().toLowerCase().trim()
+        .replace(/[çğşüıöÇĞŞÜİÖ]/g, match => trMap[match])
+        .replace(/[^a-z0-9 -]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-');
+}
 
-    randevuVeritabani.push(yeniKayıt);
-    console.log(`\n[CANLI SİSTEM]: ${isim} için ${yeniKayıt.tutar} TL ödeme alındı.`);
-    res.json({ success: true, message: `Ödeme Başarılı! No: ${randevuId}`, id: randevuId });
+// 4. ORTAK KAYIT İŞLEYİCİ FONKSİYON (NOT FOUND HATASINI BİTİREN KISIM)
+async function kayitIsleyici(req, res) {
+    try {
+        // Arayüzden gelebilecek tüm muhtemel değişken isimlerini eşliyoruz
+        const companyName = req.body.companyName || req.body.name || req.body.businessName;
+        const sectorType = req.body.sectorType || req.body.sector || req.body.type;
+        const phone = req.body.phone || req.body.tel;
+
+        if (!companyName || !sectorType || !phone) {
+            return res.status(400).json({ success: false, message: "Lütfen tüm alanları doldurun." });
+        }
+
+        let generatedSlug = slugify(companyName);
+
+        // Çakışma kontrolü
+        const mevcutDukkan = await pool.query('SELECT id FROM dukkanlar WHERE slug = $1', [generatedSlug]);
+        if (mevcutDukkan.rows.length > 0) {
+            generatedSlug = `${generatedSlug}-${Math.floor(1000 + Math.random() * 9000)}`;
+        }
+
+        // PostgreSQL'e Kayıt
+        await pool.query(
+            'INSERT INTO dukkanlar (name, sector, phone, slug) VALUES ($1, $2, $3, $4)',
+            [companyName, sectorType, phone, generatedSlug]
+        );
+
+        res.json({
+            success: true,
+            message: "🎉 Tebrikler! Kurumsal kaydınız başarıyla tamamlandı.",
+            slug: generatedSlug
+        });
+
+    } catch (error) {
+        console.error('Kayıt Hatası:', error);
+        res.status(500).json({ success: false, message: "Veri tabanına kaydedilemedi." });
+    }
+}
+
+// 5. TÜM ALTERNATİF ROTALARI TEK MERKEZE BAĞLIYORUZ (NOT FOUND SON BULUYOR)
+app.post('/api/register-business', kayitIsleyici);
+app.post('/api/register', kayitIsleyici);
+app.post('/api/business', kayitIsleyici);
+app.post('/register', kayitIsleyici);
+
+// 6. DİNAMİK MÜŞTERİ RANDEVU SAYFASI (GET RROTASI)
+app.get('/:slug', async (req, res) => {
+    try {
+        const dukkanSlug = req.params.slug;
+        
+        // Eğer yanlışlıkla alt dosya istekleri buraya düşerse engelle
+        if (dukkanSlug.includes('.') || dukkanSlug === 'favicon.ico') return;
+
+        const dukkanSorgu = await pool.query('SELECT * FROM dukkanlar WHERE slug = $1', [dukkanSlug]);
+
+        if (dukkanSorgu.rows.length === 0) {
+            return res.status(404).send(`
+                <div style="font-family:sans-serif; text-align:center; margin-top:100px;">
+                    <h1>❌ İşletme Bulunamadı</h1>
+                    <p>Aradığınız <b>${dukkanSlug}</b> adlı randevu sayfası sistemde kayıtlı değil.</p>
+                    <a href="/">Ana Sayfaya Dön</a>
+                </div>
+            `);
+        }
+
+        const dukkan = dukkanSorgu.rows[0];
+
+        res.send(`
+            <!DOCTYPE html>
+            <html lang="tr">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>${dukkan.name} - Randevu Sistemi</title>
+                <style>
+                    body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                    .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; max-width: 400px; width: 100%; }
+                    h1 { color: #2c3e50; margin-bottom: 5px; }
+                    .badge { background: #3498db; color: white; padding: 5px 12px; border-radius: 20px; font-size: 12px; display: inline-block; margin-bottom: 20px; }
+                    p { color: #7f8c8d; font-size: 15px; line-height: 1.6; }
+                    .btn { background: #2ecc71; color: white; padding: 12px 25px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; margin-top: 15px; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <h1>🗓 ${dukkan.name}</h1>
+                    <div class="badge">${dukkan.sector}</div>
+                    <p>Yapay zeka destekli akıllı randevu sistemine hoş geldiniz. Aşağıdaki butondan dilediğiniz saati seçerek randevu alabilirsiniz.</p>
+                    <p>📞 İletişim: ${dukkan.phone}</p>
+                    <button class="btn" onclick="alert('Randevu alma simülasyonu çalıştı! Yapay zeka takvimi kontrol ediyor...')">Randevu Al</button>
+                </div>
+            </body>
+            </html>
+        `);
+
+    } catch (error) {
+        console.error('Randevu Sayfası Hatası:', error);
+        res.status(500).send("Sunucu hatası nedeniyle sayfa yüklenemedi.");
+    }
 });
 
-// 2. İade (Refund) API Noktası
-app.get('/api/randevu/iptal', (req, res) => {
-    const { id } = req.query;
-    const randevu = randevuVeritabani.find(r => r.id === id);
-
-    if (!randevu) return res.status(404).send('<h1>Hata: Randevu bulunamadı!</h1>');
-    if (randevu.durum.includes('İptal')) return res.send('<h1>Bu randevu zaten iptal edilmiş.</h1>');
-
-    randevu.durum = 'İptal Edildi (İade Yapıldı)';
-    console.log(`\n[CANLI SİSTEM]: ${id} nolu işlem için para karta iade edildi.`);
-
-    res.send(`
-        <div style="font-family:sans-serif; text-align:center; margin-top:50px; background:#0f172a; color:white; padding:40px; height:100vh;">
-            <h1 style="color:#e74c3c;">❌ Randevunuz İptal Edildi</h1>
-            <p style="font-size:18px; color:#94a3b8;">${randevu.isim} adına kayıtlı ${id} nolu randevu başarıyla iptal edilmiştir.</p>
-            <p style="font-weight:bold; color:#34d399;">🔒 250.00 TL tutarındaki ücret iyzipay üzerinden kartınıza geri yüklenmiştir.</p>
-        </div>
-    `);
-});
-
-// 3. Admin Paneli Canlı Veri Akış API Noktası
-app.get('/api/admin/istatistik', (req, res) => {
-    const toplamRandevu = randevuVeritabani.length;
-    const aktifRandevu = randevuVeritabani.filter(r => r.durum === 'Onaylandı').length;
-    const iptalRandevu = randevuVeritabani.filter(r => r.durum.includes('İptal')).length;
-    const toplamKazanc = randevuVeritabani.filter(r => r.durum === 'Onaylandı').reduce((sum, r) => sum + r.tutar, 0);
-
-    res.json({ toplamRandevu, aktifRandevu, iptalRandevu, toplamKazanc, randevular: randevuVeritabani });
-});
-
-// Dinamik Port ile Sunucuyu Başlatma
+// SUNUCUYU TETİKLE
 app.listen(PORT, () => {
-    console.log(`\n==================================================`);
-    console.log(`[CANLI MOD AKTİF] Sunucu port ${PORT} üzerinde yayında.`);
-    console.log(`==================================================\n`);
+    console.log(`🚀 Sunucu ${PORT} portunda başarıyla ayağa kalktı.`);
 });
+
