@@ -14,7 +14,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// BULUT POSTGRESQL BAĞLANTI HAVUZU
+// BULUT POSTGRESQL BAĞLANTI HAVUZU (Harici External Bağlantı Uyumlu)
 const pool = new pg.Pool({
     connectionString: process.env.DATABASE_URL || process.env.MONGODB_URI,
     ssl: { rejectUnauthorized: false }
@@ -59,7 +59,7 @@ function slugify(text) {
     return text.toString().toLowerCase().trim().replace(/[çğşüıöÇĞŞÜİÖ]/g, match => trMap[match]).replace(/[^a-z0-9 -]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-');
 }
 
-// İŞLETME KAYIT
+// İŞLETME KAYIT ROTASI
 app.post('/api/register-business', async (req, res) => {
     try {
         const companyName = req.body.name || req.body.companyName;
@@ -85,7 +85,7 @@ app.post('/api/register-business', async (req, res) => {
     }
 });
 
-// API: DÜKKAN DETAYI SORGULAMA (Arayüzün Tam Beklediği Formata Çeken Kritik Bölge)
+// API: DÜKKAN VE RANDEVU DETAYLARINI GETİRME (Hata Bitiren Nokta)
 app.get('/api/dukkan-detay/:slug', async (req, res) => {
     try {
         const dukkanSlug = req.params.slug;
@@ -97,7 +97,7 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
 
         const randevularSorgu = await pool.query("SELECT id, musteri_adi, randevu_tarihi, randevu_saati FROM randevular WHERE TRIM(LOWER(dukkan_slug)) = TRIM(LOWER($1)) AND durum = 'AKTIF' ORDER BY id DESC", [dukkanSlug]);
         
-        // 💡 KİLİT ÇÖZÜM: Sorgu dizisindeki ilk elemanı (.rows[0]) doğrudan nesne olarak ayırıp gönderiyoruz!
+        // 💡 KESİN NOKTA ATISI ÇÖZÜM: .rows[0] yazarak dizideki ilk elemanı doğrudan saf tek bir nesne yapısında frontend'e gönderiyoruz!
         res.json({
             success: true,
             dukkan: dukkanSorgu.rows[0], 
@@ -108,6 +108,7 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
     }
 });
 
+// API: RANDEVU KAYDETME
 app.post('/api/book-appointment', async (req, res) => {
     try {
         const { dukkanSlug, musteriAdi, randevuTarihi, randevuSaati } = req.body;
@@ -123,6 +124,7 @@ app.post('/api/book-appointment', async (req, res) => {
     }
 });
 
+// API: YAPAY ZEKA İPTAL MOTORU
 app.post('/api/cancel-appointment', async (req, res) => {
     try {
         const { randevuId } = req.body;
@@ -149,6 +151,7 @@ app.post('/api/cancel-appointment', async (req, res) => {
     }
 });
 
+// MÜŞTERİ PANELİ STATİK DOSYA YÖNLENDİRMESİ
 app.get('/:slug', (req, res) => {
     const dukkanSlug = req.params.slug;
     if (dukkanSlug.includes('.') || dukkanSlug === 'favicon.ico') return;
@@ -156,6 +159,7 @@ app.get('/:slug', (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} üzerinde yayında.`));
+
 
 
 
