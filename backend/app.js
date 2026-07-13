@@ -1,4 +1,4 @@
-import express from ' express';
+import express from 'express';
 import pg from 'pg';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -82,6 +82,29 @@ app.post('/api/register-business', async (req, res) => {
     }
 });
 
+// API: DÜKKAN VE RANDEVU DETAYLARINI DÜZGÜN VERI YAPISINDA GETİRME
+app.get('/api/dukkan-detay/:slug', async (req, res) => {
+    try {
+        const dukkanSlug = req.params.slug;
+        const dukkanSorgu = await pool.query("SELECT name, sector, phone, slug FROM dukkanlar WHERE TRIM(LOWER(slug)) = TRIM(LOWER($1))", [dukkanSlug]);
+        
+        if (dukkanSorgu.rows.length === 0) {
+            return res.status(404).json({ success: false, message: "İşletme bulunamadı." });
+        }
+
+        const randevularSorgu = await pool.query("SELECT id, musteri_adi, randevu_tarihi, randevu_saati FROM randevular WHERE TRIM(LOWER(dukkan_slug)) = TRIM(LOWER($1)) AND durum = 'AKTIF' ORDER BY id DESC", [dukkanSlug]);
+        
+        // rows[0] diyerek dizinin ilk elemanını saf nesne yapıp arayüze teslim ediyoruz!
+        res.json({
+            success: true,
+            dukkan: dukkanSorgu.rows[0], 
+            randevular: randevularSorgu.rows
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 // API: RANDEVU KAYDETME
 app.post('/api/book-appointment', async (req, res) => {
     try {
@@ -110,73 +133,21 @@ app.post('/api/cancel-appointment', async (req, res) => {
 
         const aiMesaj = `💈 *${iptalEdilen.randevu_saati} Seansı Boşaldı!* 💈\n\nMerhaba değerli müşterimiz, dükkanımızda sıra beklediğiniz o gün için az önce acil bir iptal gerçekleşti ve koltuğumuz boşa çıktı! 😎\n\nYapay zeka takvim kontrol motoru sırayı size atadı. Randevuyu kapmak için hemen bu mesaja yanıt verebilirsiniz! 📲✨`;
 
-        res.json({ 
-            success: true, 
-            message: "⚠️ Randevu iptal edildi. Yapay zeka boşalan koltuğu kurtarmak için akıllı davet mesajını üretti!", 
-            aiGeneratedMessage: aiMesaj 
-        });
+        res.json({ success: true, message: "⚠️ Randevu iptal edildi. Yapay zeka boşalan koltuğu kurtarmak için akıllı davet mesajını üretti!", aiGeneratedMessage: aiMesaj });
     } catch (error) {
         res.status(500).json({ success: false, message: "Hata." });
     }
 });
 
-// DİNAMİK SERVER-SIDE RENDERING (Hataları %100 Bitiren Büyük Değişim!)
-app.get('/:slug', async (req, res) => {
-    try {
-        const dukkanSlug = req.params.slug;
-        if (dukkanSlug.includes('.') || dukkanSlug === 'favicon.ico') return;
+// STATİK RANDEVU SAYFASINA YÖNLENDİRME
+app.get('/:slug', (req, res) => {
+    const dukkanSlug = req.params.slug;
+    if (dukkanSlug.includes('.') || dukkanSlug === 'favicon.ico') return;
+    res.sendFile(path.join(__dirname, 'public', 'randevu.html'));
+});
 
-        // Veritabanından dükkanı ve aktif randevuları çekiyoruz
-        const dukkanSorgu = await pool.query("SELECT * FROM dukkanlar WHERE TRIM(LOWER(slug)) = TRIM(LOWER($1))", [dukkanSlug]);
-        if (dukkanSorgu.rows.length === 0) {
-            return res.status(404).send('<h1 style="text-align:center;margin-top:100px;">❌ İşletme Bulunamadı</h1>');
-        }
-        
-        const dukkan = dukkanSorgu.rows[0];
-        const randevularSorgu = await pool.query("SELECT * FROM randevular WHERE TRIM(LOWER(dukkan_slug)) = TRIM(LOWER($1)) AND durum = 'AKTIF' ORDER BY id DESC", [dukkanSlug]);
+app.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} üzerinde yayında.`));
 
-        // Aktif randevuları HTML satırlarına döküyoruz
-        let randevuSatirlari = '';
-        randevularSorgu.rows.forEach(r => {
-            randevuSatirlari += `
-                <div style="background:#fff3cd; padding:10px; border-radius:6px; margin-bottom:8px; font-size:13px; display:flex; justify-content:space-between; align-items:center; border:1px solid #ffeeba;">
-                    <span>👤 <b>${r.musteri_adi}</b> - 📅 ${r.randevu_tarihi} ⏰ ${r.randevu_saati}</span>
-                    <button onclick="randevuIptalEt(${r.id})" style="background:#e74c3c; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">İptal Et (AI Tetikle)</button>
-                </div>`;
-        });
-
-        // Sayfayı doğrudan bulut seviyesinde birleştirip tarayıcıya basıyoruz
-        let html = `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">`;
-        html += `<title>${dukkan.name} - Akıllı Randevu</title>`;
-        html += `<style>
-            body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
-            .card { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.05); text-align: center; max-width: 450px; width: 100%; box-sizing: border-box; }
-            h1 { color: #2c3e50; margin-bottom: 5px; font-size: 26px; }
-            .badge { background: #3498db; color: white; padding: 6px 14px; border-radius: 20px; font-size: 13px; display: inline-block; margin-bottom: 20px; }
-            .section-title { font-weight: bold; margin-top: 20px; margin-bottom: 10px; text-align: left; color: #34495e; font-size: 14px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-            input[type="text"], input[type="date"] { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 15px; margin-bottom: 15px; box-sizing: border-box; }
-            .time-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
-            .time-slot { background: #f8f9fa; border: 2px solid #e2e8f0; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; transition: all 0.2s; }
-            .time-slot:hover { border-color: #3498db; background: #e8f4fd; }
-            .time-slot.selected { background: #3498db; color: white; border-color: #2980b9; }
-            .btn { background: #2ecc71; color: white; padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; margin-top: 10px; }
-            .btn:hover { background: #27ae60; }
-        </style></head><body>`;
-        
-        html += `<div class="card"><h1>💈 ${dukkan.name}</h1><div class="badge">${dukkan.sector}</div>`;
-        html += `<p style="color: #7f8c8d; font-size: 14px;">Müşteri Paneli: Adınızı yazın, dilediğiniz gün ve saati seçerek anında randevu oluşturun.</p>`;
-        
-        html += `<div class="section-title">📅 Güncel Alınan Randevular</div>`;
-        html += `<div style="max-height:150px; overflow-y:auto; margin-bottom:15px;">${randevuSatirlari || '<p style="color:#aaa;font-size:12px;text-align:center;">Henüz aktif randevu bulunmuyor.</p>'}</div>`;
-
-        html += `<form id="appointmentForm">
-            <div class="section-title">👤 Yeni Randevu Al</div><input type="text" id="musteriAdi" placeholder="Örn: Mustafa Uzun" required>
-            <div class="section-title">📅 Randevu Günü Seçin</div><input type="date" id="randevuTarihi" required>
-            <div class="section-title">⏰ Uygun Saat Seçin</div>
-            <div class="time-grid">`;
-            
-        const hours = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
-        hours.forEach(h => {
 
 
 
