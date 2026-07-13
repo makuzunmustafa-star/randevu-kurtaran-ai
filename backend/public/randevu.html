@@ -58,11 +58,13 @@
 <script>
     let selectedTimeSlot = "";
     const slug = window.location.pathname.split('/').pop();
+    const currentOrigin = window.location.origin; // Canlı sitenin tam adres kökünü yakalar
 
     // Verileri API'den güvenle çekme
     async function verileriGetir() {
         try {
-            const res = await fetch(`/api/dukkan-detay/${slug}`);
+            // İstek yolunu tam canlı URL origin ile besleyerek bağlantı sorununu çözüyoruz!
+            const res = await fetch(`${currentOrigin}/api/dukkan-detay/${slug}`);
             const data = await res.json();
             if (!data.success) { document.body.innerHTML = '<h1 style="text-align:center;margin-top:100px;">❌ İşletme Bulunamadı</h1>'; return; }
             
@@ -83,11 +85,11 @@
                         </div>`;
                 });
             }
-        } catch (err) { console.error(err); }
+        } catch (err) { document.body.innerHTML = '<h1 style="text-align:center;margin-top:100px;">❌ İşletme Bulunamadı</h1>'; }
     }
     verileriGetir();
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split('T');
     document.getElementById('randevuTarihi').setAttribute('min', today);
 
     function selectTime(element, time) {
@@ -103,7 +105,7 @@
         if (!selectedTimeSlot) { alert("Lütfen bir randevu saati seçin!"); return; }
 
         try {
-            const response = await fetch('/api/book-appointment', {
+            const response = await fetch(`${currentOrigin}/api/book-appointment`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ dukkanSlug: slug, musteriAdi, randevuTarihi, randevuSaati: selectedTimeSlot })
@@ -117,7 +119,7 @@
     async function randevuIptalEt(id) {
         if (!confirm("Bu randevuyu iptal etmek ve Yapay Zeka motorunu devreye sokmak istediğinize emin misiniz?")) return;
         try {
-            const response = await fetch('/api/cancel-appointment', {
+            const response = await fetch(`${currentOrigin}/api/cancel-appointment`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ randevuId: id })
@@ -133,3 +135,4 @@
 </script>
 </body>
 </html>
+
