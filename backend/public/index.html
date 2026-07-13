@@ -3,61 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Randevu Kurtaran - Kayıt Paneli</title>
+    <title>Randevu Kurtaran - Kurumsal Kayıt ve Randevu Paneli</title>
     <style>
-        body { font-family: sans-serif; background: #1e3c72; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .box { background: white; padding: 30px; border-radius: 12px; width: 100%; max-width: 400px; box-sizing: border-box; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
-        .btn { background: #2ecc71; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; cursor: pointer; }
-        .success { display: none; text-align: center; }
-        .link { color: #1e3c72; font-weight: bold; display: block; margin-top: 15px; word-break: break-all; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #333; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box;
+        }
+        .container { background: #ffffff; padding: 40px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); max-width: 450px; width: 100%; box-sizing: border-box; }
+        h1 { font-size: 28px; color: #1e3c72; text-align: center; margin-top: 0; margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #666; font-size: 14px; margin-bottom: 30px; }
+        .promo-badge { background: #fff3cd; color: #856404; padding: 10px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 13px; margin-bottom: 25px; border: 1px solid #ffeeba; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; color: #444; }
+        input, select { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 15px; box-sizing: border-box; }
+        input:focus, select:focus { border-color: #1e3c72; outline: none; }
+        .btn { background: #2ecc71; color: white; border: none; padding: 15px; border-radius: 8px; font-size: 16px; font-weight: bold; width: 100%; cursor: pointer; margin-top: 10px; }
+        .btn:hover { background: #27ae60; }
+        .success-box { display: none; text-align: center; }
+        .success-box h2 { color: #2ecc71; margin-top: 0; }
+        .link-container { background: #f8f9fa; border: 2px dashed #2ecc71; padding: 15px; border-radius: 8px; margin: 20px 0; word-break: break-all; }
+        .customer-link { color: #1e3c72; font-weight: bold; text-decoration: underline; font-size: 16px; }
+        .panel-btn { background: #1e3c72; color: white; text-decoration: none; padding: 12px; border-radius: 8px; display: block; font-weight: bold; margin-top: 20px; }
     </style>
 </head>
 <body>
 
-<div class="box">
-    <div id="formView">
-        <h2>🗓 Randevu Kurtaran</h2>
-        <form id="regForm">
+<div class="container">
+    <!-- İŞLETME KAYIT FORMU -->
+    <div id="formSection">
+        <h1>🗓 Randevu Kurtaran</h1>
+        <div class="subtitle">Yapay zeka destekli akıllı randevu ve iptal kurtarma sistemine ilk adımı atın.</div>
+        <div class="promo-badge">🎁 Şimdi Katılın: 7 Günlük Koşulsuz Ücretsiz Deneme (0 TL)</div>
+        
+        <form id="registerForm">
             <div class="form-group">
-                <label>İşletme Adı</label>
-                <input type="text" id="companyName" required placeholder="Örn: Star Berber Salonu">
+                <label for="companyName">Şirket / Ticari İşletme Adı</label>
+                <input type="text" id="companyName" placeholder="Örn: Star Berber Salonu" required>
             </div>
+            
             <div class="form-group">
-                <label>Sektör</label>
-                <select id="sectorType">
+                <label for="sectorType">Sektör Tipi</label>
+                <select id="sectorType" required>
                     <option value="Berber / Erkek Kuaförü">Berber / Erkek Kuaförü</option>
                     <option value="Güzellik & Saç Salonu">Güzellik & Saç Salonu</option>
+                    <option value="Klinik / Doktor Muayenehanesi">Klinik / Doktor Muayenehanesi</option>
+                    <option value="Oto Servis / Araç Kiralama">Oto Servis / Araç Kiralama</option>
+                    <option value="Diğer Ticari Hizmetler">Diğer Ticari Hizmetler</option>
                 </select>
             </div>
+            
             <div class="form-group">
-                <label>Telefon</label>
-                <input type="tel" id="phone" required placeholder="Örn: 05551234567">
+                <label for="phone">Yönetici Telefon Numarası</label>
+                <input type="tel" id="phone" placeholder="Örn: 05551234567" required>
             </div>
-            <button type="submit" class="btn">7 Günlük Ücretsiz Denemeyi Başlat</button>
+            
+            <button type="submit" id="submitBtn" class="btn">7 Günlük Ücretsiz Denemeyi Başlat</button>
         </form>
     </div>
 
-    <div id="successView" class="success">
-        <h2>🎉 Kayıt Başarılı!</h2>
-        <p>Müşteri Randevu Linkiniz:</p>
-        <a id="resLink" class="link" href="#" target="_blank">Yükleniyor...</a>
+    <!-- BAŞARI EKRANI -->
+    <div id="successSection" class="success-box">
+        <h2>🎉 Tebrikler!</h2>
+        <p>Kurumsal kaydınız başarıyla tamamlandı.</p>
+        <p>👉 <b>Müşteri Randevu Linkiniz:</b></p>
+        <div class="link-container">
+            <a id="dynamicLink" class="customer-link" href="#" target="_blank">Yükleniyor...</a>
+        </div>
+        <p style="font-size: 13px; color: #666;">Müşterileriniz bu linke tıklayarak doğrudan yapay zeka takviminizden randevu alabilirler.</p>
+        <a href="/" class="panel-btn" onclick="location.reload(); return false;">Yeni Kayıt Paneline Dön</a>
     </div>
 </div>
 
 <script>
-    document.getElementById('regForm').addEventListener('submit', async function(e) {
+    document.getElementById('registerForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.innerText = "Yükleniyor, lütfen bekleyin...";
+        submitBtn.style.background = "#95a5a6";
+        submitBtn.disabled = true;
+
         const companyName = document.getElementById('companyName').value;
         const sectorType = document.getElementById('sectorType').value;
         const phone = document.getElementById('phone').value;
         
+        const currentOrigin = window.location.origin; 
+        
         try {
-            // Sunucuya tam adresle (güvenli yönlendirme) istek atıyoruz
-            const response = await fetch(`${window.location.origin}/api/register-business`, {
+            const response = await fetch(`${currentOrigin}/api/register-business`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ companyName, sectorType, phone })
@@ -66,20 +100,32 @@
             const data = await response.json();
             
             if (response.ok && data.success) {
-                document.getElementById('formView').style.display = 'none';
-                document.getElementById('successView').style.display = 'block';
+                document.getElementById('formSection').style.display = 'none';
+                document.getElementById('successSection').style.display = 'block';
                 
-                const fullUrl = `${window.location.origin}/${data.slug}`;
-                document.getElementById('resLink').innerText = fullUrl;
-                document.getElementById('resLink').href = fullUrl;
+                const realFullUrl = `${currentOrigin}/${data.slug}`;
+                const linkElement = document.getElementById('dynamicLink');
+                linkElement.innerText = realFullUrl;
+                linkElement.href = realFullUrl;
             } else {
-                alert("Sunucudan Gelen Hata: " + (data.message || "Bilinmeyen arıza"));
+                alert("Sunucu Kayıt Hatası: " + (data.message || response.statusText));
+                resetButton();
             }
         } catch (error) {
-            alert("Ağ Bağlantı Hatası: " + error.message);
+            console.error("Ağ Hatası:", error);
+            alert("Bağlantı Hatası: Veri tabanı veya sunucu şu an meşgul. Lütfen tekrar deneyin.");
+            resetButton();
         }
     });
+
+    function resetButton() {
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.innerText = "7 Günlük Ücretsiz Denemeyi Başlat";
+        submitBtn.style.background = "#2ecc71";
+        submitBtn.disabled = false;
+    }
 </script>
 
 </body>
 </html>
+
