@@ -1,0 +1,61 @@
+datasource db {
+  provider = "postgresql"
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+}
+
+enum InvoiceStatus {
+  PAID
+  FAILED
+  PENDING
+}
+
+model Business {
+  id            String         @id @default(uuid())
+  name          String
+  email         String         @unique
+  createdAt     DateTime       @default(now())
+  
+  subscription  Subscription?
+  usageLogs     UsageLog[]
+  invoices      Invoice[]
+}
+
+model Subscription {
+  id                   String             @id @default(uuid())
+  businessId           String             @unique
+  business             Business           @relation(fields: [businessId], references: [id])
+  planName             String             
+  status               SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart   DateTime           @default(now())
+  currentPeriodEnd     DateTime
+  stripeCustomerId     String?            
+  stripeSubscriptionId String?            
+  updatedAt            DateTime           @updatedAt
+}
+
+model UsageLog {
+  id            String   @id @default(uuid())
+  businessId    String
+  business      Business @relation(fields: [businessId], references: [id])
+  appointmentId String   @unique 
+  savedAt       DateTime @default(now())
+  isBilled      Boolean  @default(false)
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  businessId    String
+  business      Business      @relation(fields: [businessId], references: [id])
+  amount        Decimal       @db.Decimal(10, 2)
+  currency      String        @default("TRY")
+  status        InvoiceStatus @default(PENDING)
+  stripeInvoiceId String?
+  pdfUrl        String?
+  createdAt     DateTime      @default(now())
+}

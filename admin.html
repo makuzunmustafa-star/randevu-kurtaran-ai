@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Randevu Kurtaran - Admin Raporlama Paneli</title>
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 40px; }
+        .dashboard { max-width: 1100px; margin: 0 auto; }
+        .header-area { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; border-bottom: 1px solid #334155; padding-bottom: 20px; }
+        h1 { font-size: 26px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 12px; color: #f1f5f9; }
+        .live-indicator { background: rgba(52, 211, 153, 0.1); color: #34d399; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 99px; display: flex; align-items: center; gap: 6px; }
+        .live-dot { width: 8px; height: 8px; background: #34d399; border-radius: 50%; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { transform: scale(0.9); opacity: 1; } 50% { transform: scale(1.3); opacity: 0.5; } 100% { transform: scale(0.9); opacity: 1; } }
+        
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px; margin-bottom: 40px; }
+        .stat-card { background: #1e293b; padding: 24px; border-radius: 16px; border: 1px solid #334155; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); transition: transform 0.2s; }
+        .stat-card:hover { transform: translateY(-4px); }
+        .stat-label { color: #94a3b8; font-size: 14px; font-weight: 500; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-value { font-size: 36px; font-weight: 800; color: #38bdf8; }
+        .stat-card.money .stat-value { color: #34d399; }
+        .stat-card.cancel .stat-value { color: #f87171; }
+        
+        .table-container { background: #1e293b; border-radius: 16px; border: 1px solid #334155; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th { background: #1e293b; padding: 18px 24px; font-size: 13px; font-weight: 600; color: #94a3b8; border-bottom: 2px solid #334155; text-transform: uppercase; }
+        td { padding: 18px 24px; font-size: 14px; border-bottom: 1px solid #334155; color: #e2e8f0; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #243249; }
+        
+        .badge { padding: 6px 14px; border-radius: 99px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+        .badge.success { background: rgba(52, 211, 153, 0.1); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.2); }
+        .badge.danger { background: rgba(248, 113, 113, 0.1); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.2); }
+    </style>
+</head>
+<body>
+
+<div class="dashboard">
+    <div class="header-area">
+        <h1>🗓️ Randevu Kurtaran Kontrol Merkezi</h1>
+        <div class="live-indicator">
+            <div class="live-dot"></div> Canlı Veri Akışı Aktif
+        </div>
+    </div>
+    
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Toplam İstek</div>
+            <div id="statTotal" class="stat-value">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Aktif Randevular</div>
+            <div id="statActive" class="stat-value">0</div>
+        </div>
+        <div class="stat-card cancel">
+            <div class="stat-label">İptal Edilenler</div>
+            <div id="statCanceled" class="stat-value">0</div>
+        </div>
+        <div class="stat-card money">
+            <div class="stat-label">Brüt Kazanç</div>
+            <div id="statEarnings" class="stat-value">0 TL</div>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Randevu ID</th>
+                    <th>Müşteri Bilgisi</th>
+                    <th>Telefon Numarası</th>
+                    <th>Planlanan Zaman</th>
+                    <th>İşlem Durumu</th>
+                </tr>
+            </thead>
+            <tbody id="liveTableBody">
+                <!-- Veriler arka taraftan otomatik buraya akacak -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    async function loadDashboardData() {
+        try {
+            const res = await fetch('http://localhost:3000/api/admin/istatistik');
+            const data = await res.json();
+
+            document.getElementById('statTotal').innerText = data.toplamRandevu;
+            document.getElementById('statActive').innerText = data.aktifRandevu;
+            document.getElementById('statCanceled').innerText = data.iptalRandevu;
+            document.getElementById('statEarnings').innerText = data.toplamKazanc + ' TL';
+
+            const tbody = document.getElementById('liveTableBody');
+            tbody.innerHTML = '';
+
+            data.randevular.forEach(r => {
+                const badgeClass = r.durum === 'Onaylandı' ? 'success' : 'danger';
+                const statusText = r.durum === 'Onaylandı' ? '🟢 Onaylandı' : '🔴 İptal Edildi';
+                tbody.innerHTML += `
+                    <tr>
+                        <td style="font-weight:700; color:#38bdf8; letter-spacing:0.5px;">${r.id}</td>
+                        <td style="font-weight:600;">${r.isim}</td>
+                        <td style="color:#94a3b8;">${r.telefon}</td>
+                        <td>📅 ${r.tarih} &nbsp;&nbsp; 🕒 ${r.saat}</td>
+                        <td><span class="badge ${badgeClass}">${statusText}</span></td>
+                    </tr>
+                `;
+            });
+        } catch (e) {
+            console.error("Panel verisi güncellenirken hata:", e);
+        }
+    }
+
+    // Ekranı ilk kez yükle ve her 3 saniyede bir otomatik yenile
+    loadDashboardData();
+    setInterval(loadDashboardData, 3000);
+</script>
+</body>
+</html>

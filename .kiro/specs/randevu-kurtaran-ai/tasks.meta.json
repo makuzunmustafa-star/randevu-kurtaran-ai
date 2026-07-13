@@ -1,0 +1,160 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Monorepo ve bağımlılıkları kur": [
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722098142
+      },
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722107163
+      },
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722188317
+      }
+    ],
+    "1.2 Veritabanı şemasını ve migration sistemini kur": [
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722098342
+      },
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722196095
+      }
+    ],
+    "2.1 Auth endpoint'lerini uygula": [
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722098450
+      }
+    ],
+    "2.2 JWT middleware'ini uygula": [
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722098517
+      }
+    ],
+    "3.1 Randevu şeması ve CRUD endpoint'leri": [
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722098566
+      }
+    ],
+    "4.1 Yedek liste endpoint'lerini uygula": [
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722098652
+      }
+    ],
+    "5.1 CancellationService'i uygula": [
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722098718
+      }
+    ],
+    "6.1 NotificationService'i uygula": [
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722098758
+      }
+    ],
+    "7.1 Onay endpoint'lerini uygula": [
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722098804
+      }
+    ],
+    "8.1 Finansal analiz endpoint'lerini uygula": [
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722098846
+      }
+    ],
+    "9.1 Bildirim geçmişi endpoint'ini uygula": [
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722098895
+      }
+    ],
+    "10.1 app.ts ve server.ts'yi oluştur": [
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722098938
+      }
+    ],
+    "11.1 Giriş sayfasını ve auth context'i uygula": [
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722098985
+      }
+    ],
+    "12.1 Takvim bileşenini uygula": [
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722099029
+      }
+    ],
+    "13.1 Randevu ekleme ve silme arayüzünü uygula": [
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722099080
+      }
+    ],
+    "14.1 Yedek liste sayfasını uygula": [
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722099129
+      }
+    ],
+    "15.1 Bildirim geçmişi sayfasını uygula": [
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722099218
+      }
+    ],
+    "16.1 Public onay sayfasını uygula": [
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722099257
+      }
+    ],
+    "17.1 Finansal analiz sayfasını uygula": [
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722099300
+      }
+    ],
+    "18.1 fast-check ile doğruluk özelliği testlerini yaz": [
+      {
+        "executionId": "bc603069-ea6c-4ce6-9828-dd6655b5293c",
+        "chatSessionId": "sess_31a27388-95f5-4520-9392-485677749c16",
+        "timestamp": 1783722099345
+      }
+    ]
+  }
+}
