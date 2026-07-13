@@ -14,7 +14,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// BULUT POSTGRESQL BAĞLANTI HAVUZU (Harici External Bağlantı Uyumlu)
+// BULUT POSTGRESQL BAĞLANTI HAVUZU
 const pool = new pg.Pool({
     connectionString: process.env.DATABASE_URL || process.env.MONGODB_URI,
     ssl: { rejectUnauthorized: false }
@@ -59,10 +59,10 @@ function slugify(text) {
     return text.toString().toLowerCase().trim().replace(/[çğşüıöÇĞŞÜİÖ]/g, match => trMap[match]).replace(/[^a-z0-9 -]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-');
 }
 
-// İŞLETME KAYIT ROTASI
+// İŞLETME KAYIT ROTASI (Parametre Kaçırmayan Tam Merkezcil Yapı)
 app.post('/api/register-business', async (req, res) => {
     try {
-        const companyName = req.body.name || req.body.companyName;
+        const companyName = req.body.name || req.body.companyName || req.body.businessName;
         const sectorType = req.body.sector || req.body.sectorType || "Berber / Erkek Kuaförü";
         const phone = req.body.phone || "05550000000";
 
@@ -85,7 +85,11 @@ app.post('/api/register-business', async (req, res) => {
     }
 });
 
-// API: DÜKKAN VE RANDEVU DETAYLARINI GETİRME (Hata Bitiren Nokta)
+// ALTERNATİF ROTALAR
+app.post('/api/register', (req, res) => res.redirect(307, '/api/register-business'));
+app.post('/register', (req, res) => res.redirect(307, '/api/register-business'));
+
+// API: DÜKKAN VE RANDEVU DETAYLARINI GETİRME (Hata Bitiren Kilit Bölge)
 app.get('/api/dukkan-detay/:slug', async (req, res) => {
     try {
         const dukkanSlug = req.params.slug;
