@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Randevu Kurtaran - Kurumsal Kayıt ve Randevu Paneli</title>
+    <title>Randevu Kurtaran - Kurumsal Kayıt</title>
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', sans-serif;
             background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
             color: #333; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box;
         }
@@ -30,7 +30,6 @@
 <body>
 
 <div class="container">
-    <!-- İŞLETME KAYIT FORMU -->
     <div id="formSection">
         <h1>🗓 Randevu Kurtaran</h1>
         <div class="subtitle">Yapay zeka destekli akıllı randevu ve iptal kurtarma sistemine ilk adımı atın.</div>
@@ -47,9 +46,6 @@
                 <select id="sectorType" required>
                     <option value="Berber / Erkek Kuaförü">Berber / Erkek Kuaförü</option>
                     <option value="Güzellik & Saç Salonu">Güzellik & Saç Salonu</option>
-                    <option value="Klinik / Doktor Muayenehanesi">Klinik / Doktor Muayenehanesi</option>
-                    <option value="Oto Servis / Araç Kiralama">Oto Servis / Araç Kiralama</option>
-                    <option value="Diğer Ticari Hizmetler">Diğer Ticari Hizmetler</option>
                 </select>
             </div>
             
@@ -62,7 +58,6 @@
         </form>
     </div>
 
-    <!-- BAŞARI EKRANI -->
     <div id="successSection" class="success-box">
         <h2>🎉 Tebrikler!</h2>
         <p>Kurumsal kaydınız başarıyla tamamlandı.</p>
@@ -80,21 +75,19 @@
         e.preventDefault();
         
         const submitBtn = document.getElementById('submitBtn');
-        submitBtn.innerText = "Yükleniyor, lütfen bekleyin...";
-        submitBtn.style.background = "#95a5a6";
+        submitBtn.innerText = "Yükleniyor...";
         submitBtn.disabled = true;
 
         const companyName = document.getElementById('companyName').value;
         const sectorType = document.getElementById('sectorType').value;
         const phone = document.getElementById('phone').value;
         
-        const currentOrigin = window.location.origin; 
-        
         try {
-            const response = await fetch(`${currentOrigin}/api/register-business`, {
+            // Sunucunun app.js içindeki beklediği tam parametrelerle (name, sector, phone) gönderiyoruz (Kesin Çözüm!)
+            const response = await fetch(`${window.location.origin}/api/register-business`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ companyName, sectorType, phone })
+                body: JSON.stringify({ name: companyName, sector: sectorType, phone: phone })
             });
             
             const data = await response.json();
@@ -103,17 +96,16 @@
                 document.getElementById('formSection').style.display = 'none';
                 document.getElementById('successSection').style.display = 'block';
                 
-                const realFullUrl = `${currentOrigin}/${data.slug}`;
+                const realFullUrl = `${window.location.origin}/${data.slug}`;
                 const linkElement = document.getElementById('dynamicLink');
                 linkElement.innerText = realFullUrl;
                 linkElement.href = realFullUrl;
             } else {
-                alert("Sunucu Kayıt Hatası: " + (data.message || response.statusText));
+                alert("Kayıt Hatası: " + data.message);
                 resetButton();
             }
         } catch (error) {
-            console.error("Ağ Hatası:", error);
-            alert("Bağlantı Hatası: Veri tabanı veya sunucu şu an meşgul. Lütfen tekrar deneyin.");
+            alert("Bağlantı hatası oluştu.");
             resetButton();
         }
     });
@@ -121,11 +113,11 @@
     function resetButton() {
         const submitBtn = document.getElementById('submitBtn');
         submitBtn.innerText = "7 Günlük Ücretsiz Denemeyi Başlat";
-        submitBtn.style.background = "#2ecc71";
         submitBtn.disabled = false;
     }
 </script>
 
 </body>
 </html>
+
 
