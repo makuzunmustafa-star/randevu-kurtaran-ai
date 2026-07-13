@@ -77,7 +77,7 @@ async function kayitIsleyici(req, res) {
 app.post('/api/register-business', kayitIsleyici);
 app.post('/api/register', kayitIsleyici);
 
-// YENİ: MÜŞTERİDEN GELEN RANDEVUYU VERİ TABANINA KAYDETME ROTASI
+// YENİ: MÜŞTERI DEN GELEN RANDEVUYU VERI TABANINA KAYDETME ROTASI
 app.post('/api/book-appointment', async (req, res) => {
     try {
         const { dukkanSlug, musteriAdi, randevuTarihi, randevuSaati } = req.body;
@@ -123,7 +123,7 @@ app.get('/:slug', async (req, res) => {
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>${dukkan.name} - Akıllı Randevu</title>
+                <title>\${dukkan.name} - Akıllı Randevu</title>
                 <style>
                     body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
                     .card { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.05); text-align: center; max-width: 450px; width: 100%; box-sizing: border-box; }
@@ -141,8 +141,8 @@ app.get('/:slug', async (req, res) => {
             </head>
             <body>
                 <div class="card">
-                    <h1>💈 ${dukkan.name}</h1>
-                    <div class="badge">${dukkan.sector}</div>
+                    <h1>💈 \${dukkan.name}</h1>
+                    <div class="badge">\${dukkan.sector}</div>
                     <p style="color: #7f8c8d; font-size: 14px;">Müşteri Paneli: Adınızı yazın, dilediğiniz gün ve saati seçerek anında randevu oluşturun.</p>
                     
                     <form id="appointmentForm">
