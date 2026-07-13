@@ -66,7 +66,6 @@
             const data = await res.json();
             if (!data.success) { document.body.innerHTML = '<h1 style="text-align:center;margin-top:100px;">❌ İşletme Bulunamadı</h1>'; return; }
             
-            // 💡 ARTIK HATA VERMEZ: Gelen saf nesneyi kilitlenmeden doğrudan okuyoruz!
             document.getElementById('dukkanAdi').innerText = "💈 " + data.dukkan.name;
             document.getElementById('dukkanSektor').innerText = data.dukkan.sector;
             
@@ -118,7 +117,7 @@
     async function randevuIptalEt(id) {
         if (!confirm("Bu randevuyu iptal etmek ve Yapay Zeka motorunu devreye sokmak istediğinize emin misiniz?")) return;
         try {
-            const response = await fetch(`${currentOrigin}/api/cancel-appointment`, {
+            const response = await fetch(`${currentOrigin}/api/cancel-appointment', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ randevuId: id })
