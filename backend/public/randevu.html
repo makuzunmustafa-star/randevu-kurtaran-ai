@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Akıllı Randevu Sistemi</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .card { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.05); text-align: center; max-width: 450px; width: 100%; box-sizing: border-box; }
+        h1 { color: #2c3e50; margin-bottom: 5px; font-size: 26px; }
+        .badge { background: #3498db; color: white; padding: 6px 14px; border-radius: 20px; font-size: 13px; display: inline-block; margin-bottom: 20px; }
+        .section-title { font-weight: bold; margin-top: 20px; margin-bottom: 10px; text-align: left; color: #34495e; font-size: 14px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        input[type="text"], input[type="date"] { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 15px; margin-bottom: 15px; box-sizing: border-box; }
+        .time-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+        .time-slot { background: #f8f9fa; border: 2px solid #e2e8f0; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; transition: all 0.2s; }
+        .time-slot:hover { border-color: #3498db; background: #e8f4fd; }
+        .time-slot.selected { background: #3498db; color: white; border-color: #2980b9; }
+        .btn { background: #2ecc71; color: white; padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; margin-top: 10px; }
+        .btn:hover { background: #27ae60; }
+        .appointment-item { background:#fff3cd; padding:10px; border-radius:6px; margin-bottom:8px; font-size:13px; display:flex; justify-content:space-between; align-items:center; border:1px solid #ffeeba; text-align:left; }
+        .cancel-btn { background:#e74c3c; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1 id="dukkanAdi">💈 Yükleniyor...</h1>
+    <div id="dukkanSektor" class="badge">...</div>
+    <p style="color: #7f8c8d; font-size: 14px;">Müşteri Paneli: Adınızı yazın, dilediğiniz gün ve saati seçerek anında randevu oluşturun.</p>
+    
+    <div class="section-title">📅 Güncel Alınan Randevular</div>
+    <div id="randevularListesi" style="max-height:150px; overflow-y:auto; margin-bottom:15px;"></div>
+
+    <form id="appointmentForm">
+        <div class="section-title">👤 Yeni Randevu Al</div>
+        <input type="text" id="musteriAdi" placeholder="Örn: Mustafa Uzun" required>
+        
+        <div class="section-title">📅 Randevu Günü Seçin</div>
+        <input type="date" id="randevuTarihi" required>
+        
+        <div class="section-title">⏰ Uygun Saat Seçin</div>
+        <div class="time-grid">
+            <div class="time-slot" onclick="selectTime(this, '09:00')">09:00</div>
+            <div class="time-slot" onclick="selectTime(this, '10:00')">10:00</div>
+            <div class="time-slot" onclick="selectTime(this, '11:00')">11:00</div>
+            <div class="time-slot" onclick="selectTime(this, '13:00')">13:00</div>
+            <div class="time-slot" onclick="selectTime(this, '14:00')">14:00</div>
+            <div class="time-slot" onclick="selectTime(this, '15:00')">15:00</div>
+            <div class="time-slot" onclick="selectTime(this, '16:00')">16:00</div>
+            <div class="time-slot" onclick="selectTime(this, '17:00')">17:00</div>
+            <div class="time-slot" onclick="selectTime(this, '18:00')">18:00</div>
+        </div>
+        
+        <button type="submit" class="btn">Randevuyu Kesinleştir</button>
+    </form>
+</div>
+
+<script>
+    let selectedTimeSlot = "";
+    const slug = window.location.pathname.split('/').pop();
+
+    // Verileri API'den güvenle çekme
+    async function verileriGetir() {
+        try {
+            const res = await fetch(`/api/dukkan-detay/${slug}`);
+            const data = await res.json();
+            if (!data.success) { document.body.innerHTML = '<h1 style="text-align:center;margin-top:100px;">❌ İşletme Bulunamadı</h1>'; return; }
+            
+            document.getElementById('dukkanAdi').innerText = "💈 " + data.dukkan.name;
+            document.getElementById('dukkanSektor').innerText = data.dukkan.sector;
+            
+            const listContainer = document.getElementById('randevularListesi');
+            listContainer.innerHTML = "";
+            
+            if (data.randevular.length === 0) {
+                listContainer.innerHTML = '<p style="color:#aaa;font-size:12px;text-align:center;">Henüz aktif randevu bulunmuyor.</p>';
+            } else {
+                data.randevular.forEach(r => {
+                    listContainer.innerHTML += `
+                        <div class="appointment-item">
+                            <span>👤 <b>${r.musteri_adi}</b> - 📅 ${r.randevu_tarihi} ⏰ ${r.randevu_saati}</span>
+                            <button class="cancel-btn" onclick="randevuIptalEt(${r.id})">İptal Et (AI Tetikle)</button>
+                        </div>`;
+                });
+            }
+        } catch (err) { console.error(err); }
+    }
+    verileriGetir();
+
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('randevuTarihi').setAttribute('min', today);
+
+    function selectTime(element, time) {
+        document.querySelectorAll('.time-slot').forEach(slot => slot.classList.remove('selected'));
+        element.classList.add('selected');
+        selectedTimeSlot = time;
+    }
+
+    document.getElementById('appointmentForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const musteriAdi = document.getElementById('musteriAdi').value;
+        const randevuTarihi = document.getElementById('randevuTarihi').value;
+        if (!selectedTimeSlot) { alert("Lütfen bir randevu saati seçin!"); return; }
+
+        try {
+            const response = await fetch('/api/book-appointment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dukkanSlug: slug, musteriAdi, randevuTarihi, randevuSaati: selectedTimeSlot })
+            });
+            const data = await response.json();
+            alert(data.message);
+            if (response.ok) verileriGetir();
+        } catch (error) { alert("Ağ hatası."); }
+    });
+
+    async function randevuIptalEt(id) {
+        if (!confirm("Bu randevuyu iptal etmek ve Yapay Zeka motorunu devreye sokmak istediğinize emin misiniz?")) return;
+        try {
+            const response = await fetch('/api/cancel-appointment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ randevuId: id })
+            });
+            const data = await response.json();
+            alert(data.message);
+            if (data.aiGeneratedMessage) {
+                alert("🤖 AI WhatsApp Kurtarma Mesajı Hazırlandı:\n\n" + data.aiGeneratedMessage);
+            }
+            verileriGetir();
+        } catch (err) { alert("İptal motoru bağlantı hatası."); }
+    }
+</script>
+</body>
+</html>
