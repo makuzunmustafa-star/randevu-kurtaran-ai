@@ -4,15 +4,37 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import twilio from 'twilio';
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
 // ⭐ JWT_SECRET Render panelinde Environment Variable olarak tanımlanmalı.
-// Tanımlanmazsa geçici bir değer kullanılır ama bu GÜVENLİ DEĞİLDİR — mutlaka ekleyin.
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
-    console.error('❌ UYARI: JWT_SECRET ortam değişkeni tanımlı değil. Render > Environment sekmesinden ekleyin (rastgele uzun bir metin olabilir).');
+    console.error('❌ UYARI: JWT_SECRET ortam değişkeni tanımlı değil. Render > Environment sekmesinden ekleyin.');
+}
+
+// ⭐ TWILIO SMS AYARLARI
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
+const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
+
+let twilioClient = null;
+if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_PHONE_NUMBER) {
+    twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+    console.log('✅ Twilio SMS servisi aktif.');
+} else {
+    console.error('❌ UYARI: Twilio ortam değişkenleri eksik. SMS gönderimi devre dışı kalacak.');
+}
+
+// Türkiye telefon numaralarını E.164 formatına çevirir (05551234567 -> +905551234567)
+function telefonuE164Yap(phone) {
+    if (!phone) return null;
+    let temiz = phone.replace(/[^0-9]/g, ''); // sadece rakamlar
+    if (temiz.startsWith('0')) temiz = temiz.slice(1); // baştaki 0'ı at
+    if (temiz.startsWith('90')) temiz = temiz.slice(2); // baştaki 90'ı at (varsa)
+    return `+90${temiz}`; // +90 ekle
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -23,17 +45,15 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ⭐ VERİTABANI BAĞLANTISI
-// DATABASE_URL Render panelinde "Environment" sekmesinden ortam değişkeni olarak tanımlanmalı.
-// Kod içine ASLA gerçek şifre yazılmamalı (güvenlik açığı olur).
 const DB_URL = process.env.DATABASE_URL;
 
 if (!DB_URL) {
-    console.error('❌ HATA: DATABASE_URL ortam değişkeni tanımlı değil. Render > Environment sekmesinden ekleyin.');
+    console.error('❌ HATA: DATABASE_URL ortam değişkeni tanımlı değil.');
 }
 
 const pool = new pg.Pool({
     connectionString: DB_URL,
-    ssl: { rejectUnauthorized: false } // Bulut sunucularda SSL zorunluluğunu aşar
+    ssl: { rejectUnauthorized: false }
 });
 
 // TABLOLARI HAZIRLA
@@ -50,10 +70,10 @@ async function tabloyuHazirla() {
             );
         `);
 
-        // ⭐ MİGRATION: Panel şifre koruması için password_hash sütunu
         await pool.query(`
             ALTER TABLE dukkanlar ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);
         `);
+
         await pool.query(`
             CREATE TABLE IF NOT EXISTS randevular (
                 id SERIAL PRIMARY KEY,
@@ -66,10 +86,6 @@ async function tabloyuHazirla() {
             );
         `);
 
-        // ⭐ OTOMATİK MİGRATION: Tablo daha önce eski bir şemayla oluşturulmuşsa
-        // (örn. "durum" sütunu eksikse) burada otomatik olarak eklenir.
-        // "CREATE TABLE IF NOT EXISTS" zaten var olan tabloyu değiştirmediği için
-        // eksik sütunları buradan tamamlıyoruz.
         await pool.query(`
             ALTER TABLE randevular ADD COLUMN IF NOT EXISTS durum VARCHAR(50) DEFAULT 'AKTIF';
         `);
@@ -117,7 +133,7 @@ app.post('/api/register-business', async (req, res) => {
     }
 });
 
-// API: PANEL GİRİŞİ (Şifre doğrulama + JWT token üretme)
+// API: PANEL GİRİŞİ
 app.post('/api/dashboard-login', async (req, res) => {
     try {
         const { slug, password } = req.body;
@@ -132,8 +148,7 @@ app.post('/api/dashboard-login', async (req, res) => {
 
         const dukkan = sorgu.rows[0];
         if (!dukkan.password_hash) {
-            // Eski kayıtlarda şifre olmayabilir (migration öncesi). Bu durumda erişimi reddet.
-            return res.status(401).json({ success: false, message: "Bu işletme için panel şifresi tanımlı değil. Lütfen destek ile iletişime geçin." });
+            return res.status(401).json({ success: false, message: "Bu işletme için panel şifresi tanımlı değil." });
         }
 
         const eslesiyorMu = await bcrypt.compare(password, dukkan.password_hash);
@@ -148,7 +163,6 @@ app.post('/api/dashboard-login', async (req, res) => {
     }
 });
 
-// Yardımcı middleware: token doğrulama + istenen slug ile eşleşme kontrolü
 function panelYetkisiKontrolEt(req, res, next) {
     const authHeader = req.headers['authorization'] || '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
@@ -168,10 +182,10 @@ function panelYetkisiKontrolEt(req, res, next) {
     }
 }
 
-// API: DÜKKAN DETAYI SORGULAMA (Frontend Nesne Okuma Uyumlu)
-app.get('/api/dukkan-detay/:slug', async (req, res) => {
+// API: PANEL VERİSİ (Şifre korumalı)
+app.get('/api/dashboard-data/:slug', panelYetkisiKontrolEt, async (req, res) => {
     try {
-        const dukkanSlug = req.params.slug ? req.params.slug.trim().toLowerCase() : '';
+        const dukkanSlug = req.dukkanSlug;
         const dukkanSorgu = await pool.query("SELECT name, sector, phone, slug FROM dukkanlar WHERE LOWER(TRIM(slug)) = $1", [dukkanSlug]);
 
         if (dukkanSorgu.rows.length === 0) {
@@ -182,7 +196,7 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
 
         return res.json({
             success: true,
-            dukkan: dukkanSorgu.rows[0], // İlk dükkan nesnesi doğrudan frontend'e iletiliyor
+            dukkan: dukkanSorgu.rows[0],
             randevular: randevularSorgu.rows
         });
     } catch (error) {
@@ -190,10 +204,10 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
     }
 });
 
-// API: PANEL VERİSİ (Şifre korumalı — sadece token'ı doğru olan görebilir)
-app.get('/api/dashboard-data/:slug', panelYetkisiKontrolEt, async (req, res) => {
+// API: DÜKKAN DETAYI (Müşteri tarafı, açık erişim)
+app.get('/api/dukkan-detay/:slug', async (req, res) => {
     try {
-        const dukkanSlug = req.dukkanSlug;
+        const dukkanSlug = req.params.slug ? req.params.slug.trim().toLowerCase() : '';
         const dukkanSorgu = await pool.query("SELECT name, sector, phone, slug FROM dukkanlar WHERE LOWER(TRIM(slug)) = $1", [dukkanSlug]);
 
         if (dukkanSorgu.rows.length === 0) {
@@ -228,7 +242,7 @@ app.post('/api/book-appointment', async (req, res) => {
     }
 });
 
-// API: YAPAY ZEKA İPTAL MOTORU (Şifre korumalı — sadece panel sahibi iptal edebilir)
+// API: YAPAY ZEKA İPTAL MOTORU (Şifre korumalı + otomatik SMS)
 app.post('/api/cancel-appointment', async (req, res) => {
     try {
         const { randevuId } = req.body;
@@ -238,7 +252,6 @@ app.post('/api/cancel-appointment', async (req, res) => {
 
         const iptalEdilen = randevuSorgu.rows[0];
 
-        // Token doğrulama: gönderen kişi bu randevunun ait olduğu işletmenin sahibi mi?
         const authHeader = req.headers['authorization'] || '';
         const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
         if (!token) return res.status(401).json({ success: false, message: "Giriş yapmanız gerekiyor." });
@@ -251,11 +264,42 @@ app.post('/api/cancel-appointment', async (req, res) => {
         } catch (err) {
             return res.status(401).json({ success: false, message: "Oturum geçersiz veya süresi dolmuş." });
         }
+
         await pool.query('UPDATE randevular SET durum = \'IPTAL\' WHERE id = $1', [randevuId]);
 
         const aiMesaj = `💈 *${iptalEdilen.randevu_saati} Seansı Boşaldı!* 💈\n\nMerhaba değerli müşterimiz, dükkanımızda sıra beklediğiniz o gün için az önce acil bir iptal gerçekleşti ve koltuğumuz boşa çıktı! 😎\n\nYapay zeka takvim kontrol motoru sırayı size atadı. Randevuyu kapmak için hemen bu mesaja yanıt verebilirsiniz! 📲✨`;
 
-        res.json({ success: true, message: "⚠️ Randevu iptal edildi. Yapay zeka boşalan koltuğu kurtarmak için akıllı davet mesajını üretti!", aiGeneratedMessage: aiMesaj });
+        // ⭐ OTOMATİK SMS: İşletme sahibinin telefonuna gönder
+        let smsGonderildi = false;
+        let smsHata = null;
+
+        if (twilioClient) {
+            try {
+                const dukkanSorgu = await pool.query('SELECT phone FROM dukkanlar WHERE LOWER(TRIM(slug)) = $1', [iptalEdilen.dukkan_slug.trim().toLowerCase()]);
+                if (dukkanSorgu.rows.length > 0) {
+                    const sahibiTelefon = telefonuE164Yap(dukkanSorgu.rows[0].phone);
+                    await twilioClient.messages.create({
+                        body: aiMesaj.replace(/\*/g, ''), // SMS'te yıldız işaretleri anlamsız, temizle
+                        from: TWILIO_PHONE_NUMBER,
+                        to: sahibiTelefon
+                    });
+                    smsGonderildi = true;
+                }
+            } catch (err) {
+                smsHata = err.message;
+                console.error('❌ SMS gönderim hatası:', err.message);
+            }
+        }
+
+        res.json({
+            success: true,
+            message: smsGonderildi
+                ? "⚠️ Randevu iptal edildi. SMS işletme sahibinin telefonuna gönderildi!"
+                : "⚠️ Randevu iptal edildi. Yapay zeka davet mesajını üretti (SMS gönderilemedi).",
+            aiGeneratedMessage: aiMesaj,
+            smsGonderildi,
+            smsHata
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: "Hata." });
     }
@@ -266,14 +310,7 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.ht
 app.get('/dashboard/:slug', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 app.get('/:slug', (req, res) => {
     const dukkanSlug = req.params.slug;
-    if (dukkanSlug.includes('.') || dukkanSlug === 'favicon.ico' || dukkanSlug === 'dashboard') {
-        return res.status(404).end();
-    }
-    res.sendFile(path.join(__dirname, 'public', 'randevu.html'));
-});
-
-app.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} üzerinde yayında.`));
-
+    if (dukkanSlug.includes('.') ||
 
 
 
