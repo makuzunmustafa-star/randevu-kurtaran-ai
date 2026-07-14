@@ -310,7 +310,13 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.ht
 app.get('/dashboard/:slug', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 app.get('/:slug', (req, res) => {
     const dukkanSlug = req.params.slug;
-    if (dukkanSlug.includes('.') ||
+    if (dukkanSlug.includes('.') || dukkanSlug === 'favicon.ico' || dukkanSlug === 'dashboard') {
+        return res.status(404).end();
+    }
+    res.sendFile(path.join(__dirname, 'public', 'randevu.html'));
+});
+
+app.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} üzerinde yayında.`));
 
 
 
