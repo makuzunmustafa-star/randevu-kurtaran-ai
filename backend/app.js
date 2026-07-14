@@ -11,8 +11,12 @@ const __dirname = path.dirname(__filename);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-// public klasörünün üst dizinde (ana dizinde) olduğunu varsayarak path ayarı:
-app.use(express.static(path.join(__dirname, '..', 'public')));
+
+// ⭐ AKILLI STATİK KLASÖR BULUCU
+// HTML dosyalarınızın ana dizinde veya public klasöründe olma ihtimaline karşı çift yönlü koruma:
+const ANA_DIZIN = path.join(__dirname, '..');
+app.use(express.static(ANA_DIZIN));
+app.use(express.static(path.join(ANA_DIZIN, 'public')));
 
 // BULUT POSTGRESQL BAĞLANTI HAVUZU
 const pool = new pg.Pool({
@@ -83,7 +87,7 @@ app.post('/api/register-business', async (req, res) => {
     }
 });
 
-// API: DÜKKAN DETAYI SORGULAMA (MÜHÜRLENMİŞ SORUNSUZ NESNE PAKETLEMESİ)
+// API: DÜKKAN DETAYI SORGULAMA
 app.get('/api/dukkan-detay/:slug', async (req, res) => {
     try {
         const dukkanSlug = req.params.slug ? req.params.slug.trim().toLowerCase() : '';
@@ -95,7 +99,6 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
 
         const randevularSorgu = await pool.query("SELECT id, musteri_adi, randevu_tarihi, randevu_saati, durum FROM randevular WHERE LOWER(TRIM(dukkan_slug)) = $1 ORDER BY id DESC", [dukkanSlug]);
         
-        // ⭐ KESİN ÇÖZÜM: dukkan alanına rows[0] mühürlenerek frontend'e array değil, direkt nesne (Object) teslim ediliyor!
         return res.json({
             success: true,
             dukkan: dukkanSorgu.rows[0], 
@@ -140,26 +143,39 @@ app.post('/api/cancel-appointment', async (req, res) => {
     }
 });
 
-// ⭐ 1. ANA SAYFA ROTASI: / yazıldığında doğrudan kurumsal kayıt ekranı (index.html) açılır
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
-});
+// ⭐ YÖNLENDİRME MOTORU: Dosyayı nerede bulursa oradan dinamik olarak çeken güvenli fonksiyon
+function güvenliDosyaGonder(res, dosyaAdi) {
+    // Önce public klasöründe arar, bulamazsa doğrudan ana dizinde arar
+    const publicYolu = path.join(ANA_DIZIN, 'public', dosyaAdi);
+    const anaDizinYolu = path.join(ANA_DIZIN, dosyaAdi);
+    
+    try {
+        res.sendFile(publicYolu, (err) => {
+            if (err) {
+                res.sendFile(anaDizinYolu, (err2) => {
+                    if (err2) res.status(404).send(`<h3>Hata: ${dosyaAdi} dosyası bulunamadı! Klasör yapınızı kontrol edin.</h3>`);
+                });
+            }
+        });
+    } catch(e) {
+        res.status(500).send("Sunucu içi dosya hatası.");
+    }
+}
 
-// ⭐ 2. YÖNETİM PANELİ (DASHBOARD) ROTASI: /dashboard/isletme-adi yazıldığında admin.html açılır
-app.get('/dashboard/:slug', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'public', 'admin.html')); 
-});
+// ROTALAR
+app.get('/', (req, res) => güvenliDosyaGonder(res, 'index.html'));
+app.get('/dashboard/:slug', (req, res) => güvenliDosyaGonder(res, 'admin.html'));
 
-// ⭐ 3. MÜŞTERİ TAKVİM ROTASI: /isletme-adi yazıldığında randevu.html açılır
 app.get('/:slug', (req, res) => {
     const dukkanSlug = req.params.slug;
     if (dukkanSlug.includes('.') || dukkanSlug === 'favicon.ico' || dukkanSlug === 'dashboard') {
         return res.status(404).end();
     }
-    res.sendFile(path.join(__dirname, '..', 'public', 'randevu.html'));
+    güvenliDosyaGonder(res, 'randevu.html');
 });
 
 app.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} üzerinde yayında.`));
+
 
 
 
