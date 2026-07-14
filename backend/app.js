@@ -83,27 +83,38 @@ app.post('/api/register-business', async (req, res) => {
 });
 
 // API: DÜKKAN DETAYI SORGULAMA (Müşteri Panelinin Kullandığı Alan)
+// API: DÜKKAN DETAYI SORGULAMA (KÖKTEN DÜZELTİLMİŞ KESİN ÇÖZÜM)
 app.get('/api/dukkan-detay/:slug', async (req, res) => {
     try {
-        const dukkanSlug = req.params.slug;
-        const dukkanSorgu = await pool.query("SELECT name, sector, phone, slug FROM dukkanlar WHERE TRIM(LOWER(slug)) = TRIM(LOWER($1))", [dukkanSlug]);
+        const dukkanSlug = req.params.slug ? req.params.slug.trim().toLowerCase() : '';
+        
+        // Veri tabanında dükkanı arıyoruz
+        const dukkanSorgu = await pool.query(
+            "SELECT name, sector, phone, slug FROM dukkanlar WHERE TRIM(LOWER(slug)) = $1", 
+            [dukkanSlug]
+        );
         
         if (dukkanSorgu.rows.length === 0) {
             return res.status(404).json({ success: false, message: "İşletme bulunamadı." });
         }
 
-        const randevularSorgu = await pool.query("SELECT id, musteri_adi, randevu_tarihi, randevu_saati, durum FROM randevular WHERE TRIM(LOWER(dukkan_slug)) = TRIM(LOWER($1)) ORDER BY id DESC", [dukkanSlug]);
+        // Dükkana ait randevuları çekiyoruz
+        const randevularSorgu = await pool.query(
+            "SELECT id, musteri_adi, randevu_tarihi, randevu_saati, durum FROM randevular WHERE TRIM(LOWER(dukkan_slug)) = $1 ORDER BY id DESC", 
+            [dukkanSlug]
+        );
         
-        // ⭐ DÜZELTME: rows[0] mühürlemesi ile dizinin ilk dükkanını doğrudan tek nesne olarak teslim ediyoruz!
-        res.json({
+        // ÖNEMLİ: dukkan alanına rows dizisini değil, doğrudan rows[0] nesnesini vermeliyiz!
+        return res.json({
             success: true,
             dukkan: dukkanSorgu.rows[0], 
             randevular: randevularSorgu.rows
         });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        return res.status(500).json({ success: false, message: error.message });
     }
 });
+
 
 // API: RANDEVU KAYDETME
 app.post('/api/book-appointment', async (req, res) => {
