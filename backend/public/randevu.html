@@ -60,17 +60,16 @@
     <div class="appointments-list">
         <h3>📅 Güncel Alınan Randevular</h3>
         <div id="liveAppointments">
-            <!-- Veriler otomatik listelenecek -->
+            <!-- Veriler dinamik akacak -->
         </div>
     </div>
 </div>
 
 <script>
-    // ⭐ KESİN ÇÖZÜM: URL'deki slug değerini hiçbir karakteri kaçırmadan alan gelişmiş mantık
+    // URL'den slug değerini hatasız çeken akıllı fonksiyon
     function getCleanSlug() {
         const segments = window.location.pathname.split('/').filter(s => s.trim() !== '');
         if (segments.length === 0) return '';
-        // Eğer link /dashboard/isletme-adi şeklindeyse son segmenti al, /isletme-adi şeklindeyse ilk segmenti al
         return segments[segments.length - 1].toLowerCase().trim();
     }
 
@@ -85,32 +84,46 @@
             const res = await fetch(`/api/dukkan-detay/${dukkanSlug}`);
             const data = await res.json();
 
+            // ⭐ GÜVENLİ VERİ OKUMA MOTORU
+            // Hem dizi (array) hem de nesne (object) olarak gelen tüm backend varyasyonlarını destekler:
             if (data.success && data.dukkan) {
-                // Backend'den nesne olarak dönen dükkan ismini yazdırıyoruz
-                document.getElementById('shopName').innerText = `💈 ${data.dukkan.name}`;
+                let dukkanNesnesi = null;
                 
-                const listDiv = document.getElementById('liveAppointments');
-                listDiv.innerHTML = '';
-                
-                if (data.randevular && data.randevular.length > 0) {
-                    data.randevular.forEach(r => {
-                        const isCanceled = r.durum === 'IPTAL';
-                        listDiv.innerHTML += `
-                            <div class="appointment-item ${isCanceled ? 'canceled' : ''}">
-                                <span><strong>${r.musteri_adi}</strong></span>
-                                <span>📅 ${r.randevu_tarihi} - ⏰ ${r.randevu_saati}</span>
-                            </div>
-                        `;
-                    });
+                if (Array.isArray(data.dukkan)) {
+                    dukkanNesnesi = data.dukkan[0]; // Eğer array geldiyse ilk elemanı al
                 } else {
-                    listDiv.innerHTML = '<p style="font-size:12px; color:#64748b; margin:0;">Henüz alınan randevu yok. İlk randevuyu siz alın!</p>';
+                    dukkanNesnesi = data.dukkan; // Eğer direkt nesne geldiyse kendisini al
+                }
+
+                if (dukkanNesnesi && dukkanNesnesi.name) {
+                    document.getElementById('shopName').innerText = `💈 ${dukkanNesnesi.name}`;
+                    
+                    const listDiv = document.getElementById('liveAppointments');
+                    listDiv.innerHTML = '';
+                    
+                    const randevularListesi = data.randevular || [];
+                    if (randevularListesi.length > 0) {
+                        randevularListesi.forEach(r => {
+                            const isCanceled = r.durum === 'IPTAL';
+                            listDiv.innerHTML += `
+                                <div class="appointment-item ${isCanceled ? 'canceled' : ''}">
+                                    <span><strong>${r.musteri_adi}</strong></span>
+                                    <span>📅 ${r.randevu_tarihi} - ⏰ ${r.randevu_saati}</span>
+                                </div>
+                            `;
+                        });
+                    } else {
+                        listDiv.innerHTML = '<p style="font-size:12px; color:#64748b; margin:0;">Henüz alınan randevu yok. İlk randevuyu siz alın!</p>';
+                    }
+                } else {
+                    document.getElementById('shopName').innerText = `❌ İşletme Verisi Eksik`;
                 }
             } else {
                 document.getElementById('shopName').innerText = `❌ İşletme Bulunamadı`;
             }
         } catch (e) {
             console.error("Dükkan bilgileri yüklenirken hata:", e);
-            document.getElementById('shopName').innerText = `❌ İletişim Hatası`;
+            document.getElementById('shopName').innerText = `❌ Bağlantı Hatası`;
         }
     }
 
