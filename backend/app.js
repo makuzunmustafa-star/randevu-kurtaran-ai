@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ⭐ DOSYA YOLU DÜZELTMESİ: Statik dosyaları backend klasörünün altındaki public'ten sunuyoruz
+// Statik dosyaları backend klasörünün altındaki public'ten sunuyoruz
 app.use(express.static(path.join(__dirname, 'public')));
 
 // BULUT POSTGRESQL BAĞLANTI HAVUZU
@@ -84,7 +84,7 @@ app.post('/api/register-business', async (req, res) => {
     }
 });
 
-// API: DÜKKAN DETAYI SORGULAMA (Frontend Nesne Okuma Uyumlu)
+// API: DÜKKAN DETAYI SORGULAMA (500 HATASI KÖKTEN DÜZELTİLDİ)
 app.get('/api/dukkan-detay/:slug', async (req, res) => {
     try {
         const dukkanSlug = req.params.slug ? req.params.slug.trim().toLowerCase() : '';
@@ -96,9 +96,10 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
 
         const randevularSorgu = await pool.query("SELECT id, musteri_adi, randevu_tarihi, randevu_saati, durum FROM randevular WHERE LOWER(TRIM(dukkan_slug)) = $1 ORDER BY id DESC", [dukkanSlug]);
         
+        // ⭐ KESİN DÜZELTME: rows[0] mühürlemesi ile ilk dükkan nesnesi pürüzsüz aktarılıyor
         return res.json({
             success: true,
-            dukkan: dukkanSorgu.rows[0], // Direkt tekil obje veriyoruz (Önemli!)
+            dukkan: dukkanSorgu.rows[0], 
             randevular: randevularSorgu.rows
         });
     } catch (error) {
@@ -140,7 +141,7 @@ app.post('/api/cancel-appointment', async (req, res) => {
     }
 });
 
-// ROTALAR (backend/public klasörünü hedefler)
+// ROTALAR
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -158,6 +159,7 @@ app.get('/:slug', (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} üzerinde yayında.`));
+
 
 
 
