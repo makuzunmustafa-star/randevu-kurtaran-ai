@@ -82,13 +82,11 @@ app.post('/api/register-business', async (req, res) => {
     }
 });
 
-// API: DÜKKAN DETAYI SORGULAMA (Müşteri Panelinin Kullandığı Alan)
-// API: DÜKKAN DETAYI SORGULAMA (KÖKTEN DÜZELTİLMİŞ KESİN ÇÖZÜM)
+// API: DÜKKAN DETAYI SORGULAMA (KESİN VE HATASIZ VERİ PAKETLEMESİ)
 app.get('/api/dukkan-detay/:slug', async (req, res) => {
     try {
         const dukkanSlug = req.params.slug ? req.params.slug.trim().toLowerCase() : '';
         
-        // Veri tabanında dükkanı arıyoruz
         const dukkanSorgu = await pool.query(
             "SELECT name, sector, phone, slug FROM dukkanlar WHERE TRIM(LOWER(slug)) = $1", 
             [dukkanSlug]
@@ -98,13 +96,12 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
             return res.status(404).json({ success: false, message: "İşletme bulunamadı." });
         }
 
-        // Dükkana ait randevuları çekiyoruz
         const randevularSorgu = await pool.query(
             "SELECT id, musteri_adi, randevu_tarihi, randevu_saati, durum FROM randevular WHERE TRIM(LOWER(dukkan_slug)) = $1 ORDER BY id DESC", 
             [dukkanSlug]
         );
         
-        // ÖNEMLİ: dukkan alanına rows dizisini değil, doğrudan rows[0] nesnesini vermeliyiz!
+        // KRİTİK NOKTA: dukkan alanına rows[0] mühürlenerek tekil obje, randevulara ise tüm dizi aktarılıyor.
         return res.json({
             success: true,
             dukkan: dukkanSorgu.rows[0], 
@@ -114,7 +111,6 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
         return res.status(500).json({ success: false, message: error.message });
     }
 });
-
 
 // API: RANDEVU KAYDETME
 app.post('/api/book-appointment', async (req, res) => {
@@ -150,16 +146,15 @@ app.post('/api/cancel-appointment', async (req, res) => {
     }
 });
 
-// ⭐ 1. DASHBOARD ROTASI: /dashboard/isletme-adi yazıldığında admin.html gönderilir
+// ⭐ DASHBOARD ROTASI: /dashboard/isletme-adi
 app.get('/dashboard/:slug', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin.html')); 
 });
 
-// ⭐ 2. MÜŞTERİ TAKVİM ROTASI: /isletme-adi yazıldığında randevu.html gönderilir
+// ⭐ MÜŞTERİ TAKVİM ROTASI: /isletme-adi
 app.get('/:slug', (req, res) => {
     const dukkanSlug = req.params.slug;
     
-    // Güvenlik ve çakışma filtresi
     if (dukkanSlug.includes('.') || dukkanSlug === 'favicon.ico' || dukkanSlug === 'dashboard') {
         return res.status(404).end();
     }
