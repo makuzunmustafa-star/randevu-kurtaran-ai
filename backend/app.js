@@ -82,7 +82,7 @@ app.post('/api/register-business', async (req, res) => {
     }
 });
 
-// API: DÜKKAN DETAYI SORGULAMA
+// API: DÜKKAN DETAYI SORGULAMA (Müşteri Panelinin Kullandığı Alan)
 app.get('/api/dukkan-detay/:slug', async (req, res) => {
     try {
         const dukkanSlug = req.params.slug;
@@ -92,8 +92,9 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
             return res.status(404).json({ success: false, message: "İşletme bulunamadı." });
         }
 
-        const randevularSorgu = await pool.query("SELECT id, musteri_adi, randevu_tarihi, randevu_saati FROM randevular WHERE TRIM(LOWER(dukkan_slug)) = TRIM(LOWER($1)) AND durum = 'AKTIF' ORDER BY id DESC", [dukkanSlug]);
+        const randevularSorgu = await pool.query("SELECT id, musteri_adi, randevu_tarihi, randevu_saati, durum FROM randevular WHERE TRIM(LOWER(dukkan_slug)) = TRIM(LOWER($1)) ORDER BY id DESC", [dukkanSlug]);
         
+        // ⭐ DÜZELTME: rows[0] mühürlemesi ile dizinin ilk dükkanını doğrudan tek nesne olarak teslim ediyoruz!
         res.json({
             success: true,
             dukkan: dukkanSorgu.rows[0], 
@@ -138,20 +139,19 @@ app.post('/api/cancel-appointment', async (req, res) => {
     }
 });
 
-// ⭐ EKLEME: YÖNETİM PANELİ (DASHBOARD) ROTASI
-// Bu sayede ://siteadresi.com yazınca yönetim paneli açılacak.
+// ⭐ 1. DASHBOARD ROTASI: /dashboard/isletme-adi yazıldığında admin.html gönderilir
 app.get('/dashboard/:slug', (req, res) => {
-    // public klasörünün içindeki yönetim paneli HTML dosyanın adı neyse buraya onu yazmalısın. 
-    // Eğer adı 'panel.html' veya 'dashboard.html' ise aşağıdaki 'panel.html' kısmını ona göre güncelle.
-    res.sendFile(path.join(__dirname, 'public', 'panel.html')); 
+    res.sendFile(path.join(__dirname, 'public', 'admin.html')); 
 });
 
-// DİNAMİK MÜŞTERİ RANDEVU SAYFASI ROTASI
+// ⭐ 2. MÜŞTERİ TAKVİM ROTASI: /isletme-adi yazıldığında randevu.html gönderilir
 app.get('/:slug', (req, res) => {
     const dukkanSlug = req.params.slug;
     
-    // Özel kelimelerin slug olarak algılanmasını engelleme filtresi
-    if (dukkanSlug.includes('.') || dukkanSlug === 'favicon.ico' || dukkanSlug === 'dashboard') return res.status(404).end();
+    // Güvenlik ve çakışma filtresi
+    if (dukkanSlug.includes('.') || dukkanSlug === 'favicon.ico' || dukkanSlug === 'dashboard') {
+        return res.status(404).end();
+    }
     
     res.sendFile(path.join(__dirname, 'public', 'randevu.html'));
 });
