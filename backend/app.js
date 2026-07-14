@@ -11,15 +11,14 @@ const __dirname = path.dirname(__filename);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
+// public klasörünün üst dizinde (ana dizinde) olduğunu varsayarak path ayarı:
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
-// BULUT POSTGRESQL BAĞLANTI HAVUZU
 const pool = new pg.Pool({
     connectionString: process.env.DATABASE_URL || process.env.MONGODB_URI,
     ssl: { rejectUnauthorized: false }
 });
 
-// TABLOLARI HAZIRLA
 async function tabloyuHazirla() {
     try {
         await pool.query(`
@@ -56,7 +55,6 @@ function slugify(text) {
     return text.toString().toLowerCase().trim().replace(/[çğşüıöÇĞŞÜİÖ]/g, match => trMap[match]).replace(/[^a-z0-9 -]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-');
 }
 
-// İŞLETME KAYIT ROTASI
 app.post('/api/register-business', async (req, res) => {
     try {
         const companyName = req.body.name || req.body.companyName;
@@ -82,26 +80,17 @@ app.post('/api/register-business', async (req, res) => {
     }
 });
 
-// API: DÜKKAN DETAYI SORGULAMA (KESİN VE HATASIZ VERİ PAKETLEMESİ)
 app.get('/api/dukkan-detay/:slug', async (req, res) => {
     try {
         const dukkanSlug = req.params.slug ? req.params.slug.trim().toLowerCase() : '';
-        
-        const dukkanSorgu = await pool.query(
-            "SELECT name, sector, phone, slug FROM dukkanlar WHERE TRIM(LOWER(slug)) = $1", 
-            [dukkanSlug]
-        );
+        const dukkanSorgu = await pool.query("SELECT name, sector, phone, slug FROM dukkanlar WHERE LOWER(TRIM(slug)) = $1", [dukkanSlug]);
         
         if (dukkanSorgu.rows.length === 0) {
             return res.status(404).json({ success: false, message: "İşletme bulunamadı." });
         }
 
-        const randevularSorgu = await pool.query(
-            "SELECT id, musteri_adi, randevu_tarihi, randevu_saati, durum FROM randevular WHERE TRIM(LOWER(dukkan_slug)) = $1 ORDER BY id DESC", 
-            [dukkanSlug]
-        );
+        const randevularSorgu = await pool.query("SELECT id, musteri_adi, randevu_tarihi, randevu_saati, durum FROM randevular WHERE LOWER(TRIM(dukkan_slug)) = $1 ORDER BY id DESC", [dukkanSlug]);
         
-        // KRİTİK NOKTA: dukkan alanına rows[0] mühürlenerek tekil obje, randevulara ise tüm dizi aktarılıyor.
         return res.json({
             success: true,
             dukkan: dukkanSorgu.rows[0], 
@@ -112,7 +101,6 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
     }
 });
 
-// API: RANDEVU KAYDETME
 app.post('/api/book-appointment', async (req, res) => {
     try {
         const { dukkanSlug, musteriAdi, randevuTarihi, randevuSaati } = req.body;
@@ -128,7 +116,6 @@ app.post('/api/book-appointment', async (req, res) => {
     }
 });
 
-// API: YAPAY ZEKA İPTAL MOTORU
 app.post('/api/cancel-appointment', async (req, res) => {
     try {
         const { randevuId } = req.body;
@@ -146,20 +133,16 @@ app.post('/api/cancel-appointment', async (req, res) => {
     }
 });
 
-// ⭐ DASHBOARD ROTASI: /dashboard/isletme-adi
 app.get('/dashboard/:slug', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'admin.html')); 
+    res.sendFile(path.join(__dirname, '..', 'public', 'admin.html')); 
 });
 
-// ⭐ MÜŞTERİ TAKVİM ROTASI: /isletme-adi
 app.get('/:slug', (req, res) => {
     const dukkanSlug = req.params.slug;
-    
     if (dukkanSlug.includes('.') || dukkanSlug === 'favicon.ico' || dukkanSlug === 'dashboard') {
         return res.status(404).end();
     }
-    
-    res.sendFile(path.join(__dirname, 'public', 'randevu.html'));
+    res.sendFile(path.join(__dirname, '..', 'public', 'randevu.html'));
 });
 
 app.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} üzerinde yayında.`));
