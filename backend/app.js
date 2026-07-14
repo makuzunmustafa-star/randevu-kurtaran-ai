@@ -51,6 +51,15 @@ async function tabloyuHazirla() {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
+
+        // ⭐ OTOMATİK MİGRATION: Tablo daha önce eski bir şemayla oluşturulmuşsa
+        // (örn. "durum" sütunu eksikse) burada otomatik olarak eklenir.
+        // "CREATE TABLE IF NOT EXISTS" zaten var olan tabloyu değiştirmediği için
+        // eksik sütunları buradan tamamlıyoruz.
+        await pool.query(`
+            ALTER TABLE randevular ADD COLUMN IF NOT EXISTS durum VARCHAR(50) DEFAULT 'AKTIF';
+        `);
+
         console.log('✅ Canlı PostgreSQL Altyapısı Başarıyla Kuruldu.');
     } catch (err) {
         console.error('❌ Altyapı kurulum hatası:', err.message);
@@ -158,7 +167,6 @@ app.get('/:slug', (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} üzerinde yayında.`));
-
 
 
 
