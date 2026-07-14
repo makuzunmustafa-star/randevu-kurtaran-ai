@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Statik dosyaları backend klasörünün altındaki public'ten sunuyoruz
+// Statik dosyaları sunma ayarı
 app.use(express.static(path.join(__dirname, 'public')));
 
 // BULUT POSTGRESQL BAĞLANTI HAVUZU
@@ -69,7 +69,7 @@ app.post('/api/register-business', async (req, res) => {
 
         let generatedSlug = slugify(companyName);
         const mevcutDukkan = await pool.query('SELECT id FROM dukkanlar WHERE slug = $1', [generatedSlug]);
-        if (mevcutDukkan.rows.length > 0) {
+        if (mevcutDukkan.rows && mevcutDukkan.rows.length > 0) {
             generatedSlug = `${generatedSlug}-${Math.floor(1000 + Math.random() * 9000)}`;
         }
 
@@ -84,26 +84,42 @@ app.post('/api/register-business', async (req, res) => {
     }
 });
 
-// API: DÜKKAN DETAYI SORGULAMA (500 HATASI KÖKTEN DÜZELTİLDİ)
+// API: DÜKKAN DETAYI SORGULAMA (500 HATALARINA KARŞI ZIRHLANMIŞ SÜRÜM)
 app.get('/api/dukkan-detay/:slug', async (req, res) => {
     try {
         const dukkanSlug = req.params.slug ? req.params.slug.trim().toLowerCase() : '';
-        const dukkanSorgu = await pool.query("SELECT name, sector, phone, slug FROM dukkanlar WHERE LOWER(TRIM(slug)) = $1", [dukkanSlug]);
         
-        if (dukkanSorgu.rows.length === 0) {
+        if (!dukkanSlug) {
+            return res.status(400).json({ success: false, message: "Geçersiz dükkan adı." });
+        }
+
+        const dukkanSorgu = await pool.query(
+            "SELECT name, sector, phone, slug FROM dukkanlar WHERE LOWER(TRIM(slug)) = $1", 
+            [dukkanSlug]
+        );
+        
+        // rows kontrolünü tamamen güvenli hale getiriyoruz
+        if (!dukkanSorgu || !dukkanSorgu.rows || dukkanSorgu.rows.length === 0) {
             return res.status(404).json({ success: false, message: "İşletme bulunamadı." });
         }
 
-        const randevularSorgu = await pool.query("SELECT id, musteri_adi, randevu_tarihi, randevu_saati, durum FROM randevular WHERE LOWER(TRIM(dukkan_slug)) = $1 ORDER BY id DESC", [dukkanSlug]);
+        const randevularSorgu = await pool.query(
+            "SELECT id, musteri_adi, randevu_tarihi, randevu_saati, durum FROM randevular WHERE LOWER(TRIM(dukkan_slug)) = $1 ORDER BY id DESC", 
+            [dukkanSlug]
+        );
         
-        // ⭐ KESİN DÜZELTME: rows[0] mühürlemesi ile ilk dükkan nesnesi pürüzsüz aktarılıyor
+        const randevularListesi = (randevularSorgu && randevularSorgu.rows) ? randevularSorgu.rows : [];
+
+        // ⭐ SUNUCUNUN ÇÖKMESİNİ ÖNLEYEN EN GÜVENLİ TESLİMAT FORMATI
         return res.json({
             success: true,
-            dukkan: dukkanSorgu.rows[0], 
-            randevular: randevularSorgu.rows
+            dukkan: dukkanSorgu.rows[0], // Sadece ilk satırı nesne olarak gönderiyoruz
+            randevular: randevularListesi
         });
     } catch (error) {
-        return res.status(500).json({ success: false, message: error.message });
+        // Çökme durumunda hatanın ne olduğunu anlamak için log basıyoruz
+        console.error("Dükkan detay hatası:", error);
+        return res.status(500).json({ success: false, message: "Sunucu hatası: " + error.message });
     }
 });
 
@@ -111,7 +127,9 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
 app.post('/api/book-appointment', async (req, res) => {
     try {
         const { dukkanSlug, musteriAdi, randevuTarihi, randevuSaati } = req.body;
-        if (!dukkanSlug || !musteriAdi || !randevuTarihi || !randevuSaati) return res.status(400).json({ success: false, message: "Eksik veri." });
+        if (!dukkanSlug || !musteriAdi || !randevuTarihi || !randevuSaati) {
+            return res.status(400).json({ success: false, message: "Eksik veri." });
+        }
         
         await pool.query(
             'INSERT INTO randevular (dukkan_slug, musteri_adi, randevu_tarihi, randevu_saati) VALUES ($1, $2, $3, $4)',
@@ -119,7 +137,7 @@ app.post('/api/book-appointment', async (req, res) => {
         );
         res.json({ success: true, message: "🎉 Randevunuz başarıyla alındı! Yapay zeka koltuğunuzu ayırdı." });
     } catch (error) {
-        res.status(500).json({ success: false, message: "Hata." });
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 
@@ -128,7 +146,9 @@ app.post('/api/cancel-appointment', async (req, res) => {
     try {
         const { randevuId } = req.body;
         const randevuSorgu = await pool.query('SELECT * FROM randevular WHERE id = $1', [randevuId]);
-        if (randevuSorgu.rows.length === 0) return res.status(404).json({ success: false, message: "Bulunamadı." });
+        if (!randevuSorgu || randevuSorgu.rows.length === 0) {
+            return res.status(404).json({ success: false, message: "Bulunamadı." });
+        }
         
         const iptalEdilen = randevuSorgu.rows[0];
         await pool.query('UPDATE randevular SET durum = \'IPTAL\' WHERE id = $1', [randevuId]);
@@ -137,7 +157,7 @@ app.post('/api/cancel-appointment', async (req, res) => {
 
         res.json({ success: true, message: "⚠️ Randevu iptal edildi. Yapay zeka boşalan koltuğu kurtarmak için akıllı davet mesajını üretti!", aiGeneratedMessage: aiMesaj });
     } catch (error) {
-        res.status(500).json({ success: false, message: "Hata." });
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 
@@ -159,6 +179,7 @@ app.get('/:slug', (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} üzerinde yayında.`));
+
 
 
 
