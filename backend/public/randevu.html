@@ -66,22 +66,23 @@
 </div>
 
 <script>
-    // URL'den işletmenin slug değerini alıyoruz (Örn: /berber-mustafa)
-    const pathSegments = window.location.pathname.split('/');
-    const dukkanSlug = pathSegments[pathSegments.length - 1];
+  <script>
+    // URL'den slug değerini temiz ve hatasız şekilde ayıklayan kesin çözüm
+    const pathName = window.location.pathname.replace(/^\/|\/$/g, ''); 
+    const pathSegments = pathName.split('/');
+    // Eğer /dashboard/berber-mustafa ise son segmenti al, sadece /berber-mustafa ise yine onu al
+    const dukkanSlug = pathSegments[pathSegments.length - 1].toLowerCase().trim();
 
-    // Sayfa açıldığında dükkan detaylarını ve mevcut randevuları çeken fonksiyon
     async function loadShopDetails() {
-        if (!dukkanSlug) return;
+        if (!dukkanSlug || dukkanSlug === 'dashboard') return;
         try {
             const res = await fetch(`/api/dukkan-detay/${dukkanSlug}`);
             const data = await res.json();
 
-            if (data.success && data.dukkan) {
-                // Yükleniyor yazısını veritabanındaki dükkan adıyla değiştiriyoruz
+            // data.dukkan nesnesi ve data.dukkan.name değeri varsa içeriği bas
+            if (data.success && data.dukkan && data.dukkan.name) {
                 document.getElementById('shopName').innerText = `💈 ${data.dukkan.name}`;
                 
-                // Alınan randevuları listeleme
                 const listDiv = document.getElementById('liveAppointments');
                 listDiv.innerHTML = '';
                 
@@ -103,10 +104,10 @@
             }
         } catch (e) {
             console.error("Dükkan bilgileri yüklenirken hata:", e);
+            document.getElementById('shopName').innerText = `❌ Bağlantı Hatası`;
         }
     }
 
-    // Form gönderildiğinde yeni randevu kaydeden fonksiyon
     document.getElementById('appointmentForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -125,19 +126,232 @@
             if (data.success) {
                 alert(data.message);
                 document.getElementById('appointmentForm').reset();
-                loadShopDetails(); // Listeyi güncelle
+                loadShopDetails();
             } else {
                 alert("Hata: " + data.message);
             }
         } catch (error) {
             console.error("Randevu kaydedilirken hata:", error);
-            alert("Sistemde bir hata oluştu, lütfen tekrar deneyin.");
+            alert("Sistemde bir hata oluştu.");
         }
     });
 
-    // Sayfa yüklenince dükkan verilerini getir
     loadShopDetails();
 </script>
-</body>
-</html>
+<script>
+    // URL'den slug değerini temiz ve hatasız şekilde ayıklayan kesin çözüm
+    const pathName = window.location.pathname.replace(/^\/|\/$/g, ''); 
+    const pathSegments = pathName.split('/');
+    // Eğer /dashboard/berber-mustafa ise son segmenti al, sadece /berber-mustafa ise yine onu al
+    const dukkanSlug = pathSegments[pathSegments.length - 1].toLowerCase().trim();
+
+    async function loadShopDetails() {
+        if (!dukkanSlug || dukkanSlug === 'dashboard') return;
+        try {
+            const res = await fetch(`/api/dukkan-detay/${dukkanSlug}`);
+            const data = await res.json();
+
+            // data.dukkan nesnesi ve data.dukkan.name değeri varsa içeriği bas
+            if (data.success && data.dukkan && data.dukkan.name) {
+                document.getElementById('shopName').innerText = `💈 ${data.dukkan.name}`;
+                
+                const listDiv = document.getElementById('liveAppointments');
+                listDiv.innerHTML = '';
+                
+                if (data.randevular && data.randevular.length > 0) {
+                    data.randevular.forEach(r => {
+                        const isCanceled = r.durum === 'IPTAL';
+                        listDiv.innerHTML += `
+                            <div class="appointment-item ${isCanceled ? 'canceled' : ''}">
+                                <span><strong>${r.musteri_adi}</strong></span>
+                                <span>📅 ${r.randevu_tarihi} - ⏰ ${r.randevu_saati}</span>
+                            </div>
+                        `;
+                    });
+                } else {
+                    listDiv.innerHTML = '<p style="font-size:12px; color:#64748b; margin:0;">Henüz alınan randevu yok. İlk randevuyu siz alın!</p>';
+                }
+            } else {
+                document.getElementById('shopName').innerText = `❌ İşletme Bulunamadı`;
+            }
+        } catch (e) {
+            console.error("Dükkan bilgileri yüklenirken hata:", e);
+            document.getElementById('shopName').innerText = `❌ Bağlantı Hatası`;
+        }
+    }
+
+    document.getElementById('appointmentForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const musteriAdi = document.getElementById('musteriAdi').value;
+        const randevuTarihi = document.getElementById('randevuTarihi').value;
+        const randevuSaati = document.getElementById('randevuSaati').value;
+
+        try {
+            const res = await fetch('/api/book-appointment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dukkanSlug, musteriAdi, randevuTarihi, randevuSaati })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                alert(data.message);
+                document.getElementById('appointmentForm').reset();
+                loadShopDetails();
+            } else {
+                alert("Hata: " + data.message);
+            }
+        } catch (error) {
+            console.error("Randevu kaydedilirken hata:", error);
+            alert("Sistemde bir hata oluştu.");
+        }
+    });
+
+    loadShopDetails();
+</script>
+<script>
+    // URL'den slug değerini temiz ve hatasız şekilde ayıklayan kesin çözüm
+    const pathName = window.location.pathname.replace(/^\/|\/$/g, ''); 
+    const pathSegments = pathName.split('/');
+    // Eğer /dashboard/berber-mustafa ise son segmenti al, sadece /berber-mustafa ise yine onu al
+    const dukkanSlug = pathSegments[pathSegments.length - 1].toLowerCase().trim();
+
+    async function loadShopDetails() {
+        if (!dukkanSlug || dukkanSlug === 'dashboard') return;
+        try {
+            const res = await fetch(`/api/dukkan-detay/${dukkanSlug}`);
+            const data = await res.json();
+
+            // data.dukkan nesnesi ve data.dukkan.name değeri varsa içeriği bas
+            if (data.success && data.dukkan && data.dukkan.name) {
+                document.getElementById('shopName').innerText = `💈 ${data.dukkan.name}`;
+                
+                const listDiv = document.getElementById('liveAppointments');
+                listDiv.innerHTML = '';
+                
+                if (data.randevular && data.randevular.length > 0) {
+                    data.randevular.forEach(r => {
+                        const isCanceled = r.durum === 'IPTAL';
+                        listDiv.innerHTML += `
+                            <div class="appointment-item ${isCanceled ? 'canceled' : ''}">
+                                <span><strong>${r.musteri_adi}</strong></span>
+                                <span>📅 ${r.randevu_tarihi} - ⏰ ${r.randevu_saati}</span>
+                            </div>
+                        `;
+                    });
+                } else {
+                    listDiv.innerHTML = '<p style="font-size:12px; color:#64748b; margin:0;">Henüz alınan randevu yok. İlk randevuyu siz alın!</p>';
+                }
+            } else {
+                document.getElementById('shopName').innerText = `❌ İşletme Bulunamadı`;
+            }
+        } catch (e) {
+            console.error("Dükkan bilgileri yüklenirken hata:", e);
+            document.getElementById('shopName').innerText = `❌ Bağlantı Hatası`;
+        }
+    }
+
+    document.getElementById('appointmentForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const musteriAdi = document.getElementById('musteriAdi').value;
+        const randevuTarihi = document.getElementById('randevuTarihi').value;
+        const randevuSaati = document.getElementById('randevuSaati').value;
+
+        try {
+            const res = await fetch('/api/book-appointment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dukkanSlug, musteriAdi, randevuTarihi, randevuSaati })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                alert(data.message);
+                document.getElementById('appointmentForm').reset();
+                loadShopDetails();
+            } else {
+                alert("Hata: " + data.message);
+            }
+        } catch (error) {
+            console.error("Randevu kaydedilirken hata:", error);
+            alert("Sistemde bir hata oluştu.");
+        }
+    });
+
+    loadShopDetails();
+</script>
+<script>
+    // URL'den slug değerini temiz ve hatasız şekilde ayıklayan kesin çözüm
+    const pathName = window.location.pathname.replace(/^\/|\/$/g, ''); 
+    const pathSegments = pathName.split('/');
+    // Eğer /dashboard/berber-mustafa ise son segmenti al, sadece /berber-mustafa ise yine onu al
+    const dukkanSlug = pathSegments[pathSegments.length - 1].toLowerCase().trim();
+
+    async function loadShopDetails() {
+        if (!dukkanSlug || dukkanSlug === 'dashboard') return;
+        try {
+            const res = await fetch(`/api/dukkan-detay/${dukkanSlug}`);
+            const data = await res.json();
+
+            // data.dukkan nesnesi ve data.dukkan.name değeri varsa içeriği bas
+            if (data.success && data.dukkan && data.dukkan.name) {
+                document.getElementById('shopName').innerText = `💈 ${data.dukkan.name}`;
+                
+                const listDiv = document.getElementById('liveAppointments');
+                listDiv.innerHTML = '';
+                
+                if (data.randevular && data.randevular.length > 0) {
+                    data.randevular.forEach(r => {
+                        const isCanceled = r.durum === 'IPTAL';
+                        listDiv.innerHTML += `
+                            <div class="appointment-item ${isCanceled ? 'canceled' : ''}">
+                                <span><strong>${r.musteri_adi}</strong></span>
+                                <span>📅 ${r.randevu_tarihi} - ⏰ ${r.randevu_saati}</span>
+                            </div>
+                        `;
+                    });
+                } else {
+                    listDiv.innerHTML = '<p style="font-size:12px; color:#64748b; margin:0;">Henüz alınan randevu yok. İlk randevuyu siz alın!</p>';
+                }
+            } else {
+                document.getElementById('shopName').innerText = `❌ İşletme Bulunamadı`;
+            }
+        } catch (e) {
+            console.error("Dükkan bilgileri yüklenirken hata:", e);
+            document.getElementById('shopName').innerText = `❌ Bağlantı Hatası`;
+        }
+    }
+
+    document.getElementById('appointmentForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const musteriAdi = document.getElementById('musteriAdi').value;
+        const randevuTarihi = document.getElementById('randevuTarihi').value;
+        const randevuSaati = document.getElementById('randevuSaati').value;
+
+        try {
+            const res = await fetch('/api/book-appointment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dukkanSlug, musteriAdi, randevuTarihi, randevuSaati })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                alert(data.message);
+                document.getElementById('appointmentForm').reset();
+                loadShopDetails();
+            } else {
+                alert("Hata: " + data.message);
+            }
+        } catch (error) {
+            console.error("Randevu kaydedilirken hata:", error);
+            alert("Sistemde bir hata oluştu.");
+        }
+    });
+
+    loadShopDetails();
+</script>
 
