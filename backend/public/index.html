@@ -18,6 +18,7 @@
         label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; color: #444; }
         input, select { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 15px; box-sizing: border-box; }
         input:focus, select:focus { border-color: #1e3c72; outline: none; }
+        .hint { font-size: 12px; color: #888; margin-top: 6px; }
         .btn { background: #2ecc71; color: white; border: none; padding: 15px; border-radius: 8px; font-size: 16px; font-weight: bold; width: 100%; cursor: pointer; margin-top: 10px; }
         .btn:hover { background: #27ae60; }
         .success-box { display: none; text-align: center; }
@@ -25,6 +26,7 @@
         .link-container { background: #f8f9fa; border: 2px dashed #2ecc71; padding: 15px; border-radius: 8px; margin: 20px 0; word-break: break-all; }
         .customer-link { color: #1e3c72; font-weight: bold; text-decoration: underline; font-size: 16px; }
         .panel-btn { background: #1e3c72; color: white; text-decoration: none; padding: 12px; border-radius: 8px; display: block; font-weight: bold; margin-top: 20px; }
+        .dashboard-note { background: #eef6ff; border: 1px solid #cfe4ff; border-radius: 8px; padding: 12px; font-size: 13px; color: #1e3c72; margin-top: 16px; text-align: left; }
     </style>
 </head>
 <body>
@@ -34,13 +36,13 @@
         <h1>🗓 Randevu Kurtaran</h1>
         <div class="subtitle">Yapay zeka destekli akıllı randevu ve iptal kurtarma sistemine ilk adımı atın.</div>
         <div class="promo-badge">🎁 Şimdi Katılın: 7 Günlük Koşulsuz Ücretsiz Deneme (0 TL)</div>
-        
+
         <form id="registerForm">
             <div class="form-group">
                 <label for="companyName">Şirket / Ticari İşletme Adı</label>
                 <input type="text" id="companyName" placeholder="Örn: Star Berber Salonu" required>
             </div>
-            
+
             <div class="form-group">
                 <label for="sectorType">Sektör Tipi</label>
                 <select id="sectorType" required>
@@ -48,12 +50,18 @@
                     <option value="Güzellik & Saç Salonu">Güzellik & Saç Salonu</option>
                 </select>
             </div>
-            
+
             <div class="form-group">
                 <label for="phone">Yönetici Telefon Numarası</label>
                 <input type="tel" id="phone" placeholder="Örn: 05551234567" required>
             </div>
-            
+
+            <div class="form-group">
+                <label for="password">Panel Şifresi Belirleyin</label>
+                <input type="password" id="password" placeholder="En az 4 karakter" minlength="4" required>
+                <div class="hint">Bu şifreyi yönetici panelinize (randevularınızı görmek ve iptal etmek için) girişte kullanacaksınız. Unutmayın!</div>
+            </div>
+
             <button type="submit" id="submitBtn" class="btn">7 Günlük Ücretsiz Denemeyi Başlat</button>
         </form>
     </div>
@@ -66,6 +74,9 @@
             <a id="dynamicLink" class="customer-link" href="#" target="_blank">Yükleniyor...</a>
         </div>
         <p style="font-size: 13px; color: #666;">Müşterileriniz bu linke tıklayarak doğrudan yapay zeka takviminizden randevu alabilirler.</p>
+        <div class="dashboard-note">
+            🔒 Yönetici panelinize <b id="dashboardLink"></b> adresinden, az önce belirlediğiniz şifreyle giriş yapabilirsiniz.
+        </div>
         <a href="/" class="panel-btn" onclick="location.reload(); return false;">Yeni Kayıt Paneline Dön</a>
     </div>
 </div>
@@ -73,7 +84,7 @@
 <script>
     document.getElementById('registerForm').addEventListener('submit', async function(e) {
         e.preventDefault();
-        
+
         const submitBtn = document.getElementById('submitBtn');
         submitBtn.innerText = "Yükleniyor...";
         submitBtn.disabled = true;
@@ -81,25 +92,28 @@
         const companyName = document.getElementById('companyName').value;
         const sectorType = document.getElementById('sectorType').value;
         const phone = document.getElementById('phone').value;
-        
+        const password = document.getElementById('password').value;
+
         try {
-            // Sunucunun app.js içindeki beklediği tam parametrelerle (name, sector, phone) gönderiyoruz (Kesin Çözüm!)
             const response = await fetch(`${window.location.origin}/api/register-business`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: companyName, sector: sectorType, phone: phone })
+                body: JSON.stringify({ name: companyName, sector: sectorType, phone: phone, password: password })
             });
-            
+
             const data = await response.json();
-            
+
             if (response.ok && data.success) {
                 document.getElementById('formSection').style.display = 'none';
                 document.getElementById('successSection').style.display = 'block';
-                
+
                 const realFullUrl = `${window.location.origin}/${data.slug}`;
                 const linkElement = document.getElementById('dynamicLink');
                 linkElement.innerText = realFullUrl;
                 linkElement.href = realFullUrl;
+
+                const dashboardUrl = `${window.location.origin}/dashboard/${data.slug}`;
+                document.getElementById('dashboardLink').innerText = dashboardUrl;
             } else {
                 alert("Kayıt Hatası: " + data.message);
                 resetButton();
@@ -119,5 +133,4 @@
 
 </body>
 </html>
-
 
