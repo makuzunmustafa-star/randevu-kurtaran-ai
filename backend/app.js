@@ -13,12 +13,17 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ⭐ KESİN VE DOĞRULANMIŞ DIŞ AĞ (EXTERNAL) POSTGRESQL ADRESİ
-// Bölge uyuşmazlığı yaşamamak için Frankfurt sunucu uzantısı koda doğrudan işlendi.
-const GERCEK_DB_URL = process.env.DATABASE_URL || "postgresql://randevu_db_0lc5_user:HKXEXbogyUjQAiS2PgQYFTn4iaPgmlXN@://render.com";
+// ⭐ VERİTABANI BAĞLANTISI
+// DATABASE_URL Render panelinde "Environment" sekmesinden ortam değişkeni olarak tanımlanmalı.
+// Kod içine ASLA gerçek şifre yazılmamalı (güvenlik açığı olur).
+const DB_URL = process.env.DATABASE_URL;
+
+if (!DB_URL) {
+    console.error('❌ HATA: DATABASE_URL ortam değişkeni tanımlı değil. Render > Environment sekmesinden ekleyin.');
+}
 
 const pool = new pg.Pool({
-    connectionString: GERCEK_DB_URL,
+    connectionString: DB_URL,
     ssl: { rejectUnauthorized: false } // Bulut sunucularda SSL zorunluluğunu aşar
 });
 
@@ -90,13 +95,13 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
     try {
         const dukkanSlug = req.params.slug ? req.params.slug.trim().toLowerCase() : '';
         const dukkanSorgu = await pool.query("SELECT name, sector, phone, slug FROM dukkanlar WHERE LOWER(TRIM(slug)) = $1", [dukkanSlug]);
-        
+
         if (dukkanSorgu.rows.length === 0) {
             return res.status(404).json({ success: false, message: "İşletme bulunamadı." });
         }
 
         const randevularSorgu = await pool.query("SELECT id, musteri_adi, randevu_tarihi, randevu_saati, durum FROM randevular WHERE LOWER(TRIM(dukkan_slug)) = $1 ORDER BY id DESC", [dukkanSlug]);
-        
+
         return res.json({
             success: true,
             dukkan: dukkanSorgu.rows[0], // İlk dükkan nesnesi doğrudan frontend'e iletiliyor
@@ -112,7 +117,7 @@ app.post('/api/book-appointment', async (req, res) => {
     try {
         const { dukkanSlug, musteriAdi, randevuTarihi, randevuSaati } = req.body;
         if (!dukkanSlug || !musteriAdi || !randevuTarihi || !randevuSaati) return res.status(400).json({ success: false, message: "Eksik veri." });
-        
+
         await pool.query(
             'INSERT INTO randevular (dukkan_slug, musteri_adi, randevu_tarihi, randevu_saati) VALUES ($1, $2, $3, $4)',
             [dukkanSlug.trim().toLowerCase(), musteriAdi, randevuTarihi, randevuSaati]
@@ -129,7 +134,7 @@ app.post('/api/cancel-appointment', async (req, res) => {
         const { randevuId } = req.body;
         const randevuSorgu = await pool.query('SELECT * FROM randevular WHERE id = $1', [randevuId]);
         if (randevuSorgu.rows.length === 0) return res.status(404).json({ success: false, message: "Bulunamadı." });
-        
+
         const iptalEdilen = randevuSorgu.rows[0];
         await pool.query('UPDATE randevular SET durum = \'IPTAL\' WHERE id = $1', [randevuId]);
 
