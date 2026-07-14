@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yönetici Paneli - Randevu Kurtaran</title>
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; min-height: 100vh; box-sizing: border-box; }
+        .wrap { max-width: 700px; margin: 0 auto; }
+        h1 { font-size: 24px; font-weight: 700; color: #38bdf8; margin-bottom: 4px; }
+        .subtitle { font-size: 14px; color: #94a3b8; margin-bottom: 24px; }
+        .stats { display: flex; gap: 12px; margin-bottom: 24px; }
+        .stat-box { flex: 1; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px; text-align: center; }
+        .stat-box .num { font-size: 28px; font-weight: 700; color: #38bdf8; }
+        .stat-box .label { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+        .appt-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+        .appt-card.canceled { opacity: 0.5; }
+        .appt-info .name { font-weight: 700; font-size: 15px; }
+        .appt-info .meta { font-size: 13px; color: #94a3b8; margin-top: 4px; }
+        .badge { font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: 700; margin-left: 8px; }
+        .badge.aktif { background: #064e3b; color: #34d399; }
+        .badge.iptal { background: #450a0a; color: #f87171; }
+        .btn-cancel { background: #ef4444; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+        .btn-cancel:hover { background: #dc2626; }
+        .btn-cancel:disabled { background: #334155; cursor: not-allowed; }
+        .empty { text-align: center; color: #64748b; font-size: 14px; padding: 40px 0; }
+        .ai-message-box { background: #0f172a; border: 2px dashed #38bdf8; border-radius: 12px; padding: 16px; margin-bottom: 20px; display: none; }
+        .ai-message-box h3 { margin-top: 0; font-size: 14px; color: #38bdf8; }
+        .ai-message-box textarea { width: 100%; min-height: 100px; background: #1e293b; color: #f8fafc; border: 1px solid #334155; border-radius: 8px; padding: 10px; font-size: 13px; box-sizing: border-box; resize: vertical; }
+        .btn-copy { background: #38bdf8; color: #0f172a; border: none; padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+        .customer-link-box { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 14px; margin-bottom: 20px; font-size: 13px; word-break: break-all; }
+        .customer-link-box a { color: #38bdf8; }
+        .login-box { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 32px; max-width: 380px; margin: 60px auto 0; }
+        .login-box h2 { color: #38bdf8; text-align: center; margin-top: 0; font-size: 20px; }
+        .login-box label { display: block; font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 8px; }
+        .login-box input { width: 100%; padding: 12px 16px; background: #0f172a; border: 1px solid #334155; border-radius: 10px; color: #f8fafc; font-size: 15px; box-sizing: border-box; margin-bottom: 16px; }
+        .login-box .btn-login { width: 100%; padding: 14px; background: #38bdf8; color: #0f172a; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; }
+        .login-error { color: #f87171; font-size: 13px; text-align: center; margin-top: 10px; display: none; }
+        #dashboardContent { display: none; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+
+    <div class="login-box" id="loginBox">
+        <h2>🔒 Panel Girişi</h2>
+        <form id="loginForm">
+            <label>Panel Şifreniz</label>
+            <input type="password" id="loginPassword" required autofocus>
+            <button type="submit" class="btn-login">Giriş Yap</button>
+            <div class="login-error" id="loginError">Şifre hatalı, lütfen tekrar deneyin.</div>
+        </form>
+    </div>
+
+    <div id="dashboardContent">
+        <h1 id="shopName">💈 Yükleniyor...</h1>
+        <p class="subtitle">Yönetici Paneli — Randevularını görüntüle ve iptalleri yönet.</p>
+
+        <div class="customer-link-box">
+            👉 Müşteri Randevu Linkiniz: <a id="customerLink" href="#" target="_blank">Yükleniyor...</a>
+        </div>
+
+        <div class="ai-message-box" id="aiMessageBox">
+            <h3>🤖 Yapay Zeka Davet Mesajı Üretildi</h3>
+            <textarea id="aiMessageText" readonly></textarea>
+            <button class="btn-copy" onclick="kopyalaMesaj()">📋 Mesajı Kopyala</button>
+        </div>
+
+        <div class="stats">
+            <div class="stat-box"><div class="num" id="statAktif">0</div><div class="label">Aktif Randevu</div></div>
+            <div class="stat-box"><div class="num" id="statIptal">0</div><div class="label">İptal Edilen</div></div>
+        </div>
+
+        <div id="appointmentsList"></div>
+    </div>
+</div>
+
+<script>
+    function getCleanSlug() {
+        const segments = window.location.pathname.split('/').filter(s => s.trim() !== '');
+        return segments.length > 0 ? segments[segments.length - 1].toLowerCase().trim() : '';
+    }
+
+    const dukkanSlug = getCleanSlug();
+    const tokenKey = `panel_token_${dukkanSlug}`;
+
+    function getToken() {
+        return localStorage.getItem(tokenKey);
+    }
+
+    function setToken(token) {
+        localStorage.setItem(tokenKey, token);
+    }
+
+    function clearToken() {
+        localStorage.removeItem(tokenKey);
+    }
+
+    function kopyalaMesaj() {
+        const textarea = document.getElementById('aiMessageText');
+        textarea.select();
+        document.execCommand('copy');
+        alert('Mesaj kopyalandı! Şimdi WhatsApp veya SMS uygulamanıza yapıştırabilirsiniz.');
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const password = document.getElementById('loginPassword').value;
+        const errorEl = document.getElementById('loginError');
+        errorEl.style.display = 'none';
+
+        try {
+            const res = await fetch('/api/dashboard-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ slug: dukkanSlug, password })
+            });
+            const data = await res.json();
+
+            if (data.success && data.token) {
+                setToken(data.token);
+                document.getElementById('loginBox').style.display = 'none';
+                document.getElementById('dashboardContent').style.display = 'block';
+                loadDashboard();
+            } else {
+                errorEl.innerText = data.message || 'Şifre hatalı, lütfen tekrar deneyin.';
+                errorEl.style.display = 'block';
+            }
+        } catch (err) {
+            errorEl.innerText = 'Bağlantı hatası oluştu.';
+            errorEl.style.display = 'block';
+        }
+    });
+
+    if (getToken()) {
+        document.getElementById('loginBox').style.display = 'none';
+        document.getElementById('dashboardContent').style.display = 'block';
+        loadDashboard();
+    }
+
+    async function loadDashboard() {
+        if (!dukkanSlug) {
+            document.getElementById('shopName').innerText = '❌ Geçersiz Panel';
+            return;
+        }
+        try {
+            const res = await fetch(`/api/dashboard-data/${dukkanSlug}`, {
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            const data = await res.json();
+
+            if (res.status === 401 || res.status === 403) {
+                clearToken();
+                document.getElementById('loginBox').style.display = 'block';
+                document.getElementById('dashboardContent').style.display = 'none';
+                document.getElementById('loginError').innerText = data.message || 'Lütfen tekrar giriş yapın.';
+                document.getElementById('loginError').style.display = 'block';
+                return;
+            }
+
+            if (!data.success || !data.dukkan) {
+                document.getElementById('shopName').innerText = '❌ İşletme Bulunamadı';
+                return;
+            }
+
+            const dukkan = Array.isArray(data.dukkan) ? data.dukkan[0] : data.dukkan;
+            document.getElementById('shopName').innerText = `💈 ${dukkan.name} - Panel`;
+
+            const customerUrl = `${window.location.origin}/${dukkanSlug}`;
+            const linkEl = document.getElementById('customerLink');
+            linkEl.innerText = customerUrl;
+            linkEl.href = customerUrl;
+
+            renderAppointments(data.randevular || []);
+        } catch (e) {
+            console.error(e);
+            document.getElementById('shopName').innerText = '❌ Bağlantı Hatası';
+        }
+    }
+
+    function renderAppointments(randevular) {
+        const listDiv = document.getElementById('appointmentsList');
+        listDiv.innerHTML = '';
+
+        const aktifSayisi = randevular.filter(r => r.durum !== 'IPTAL').length;
+        const iptalSayisi = randevular.filter(r => r.durum === 'IPTAL').length;
+        document.getElementById('statAktif').innerText = aktifSayisi;
+        document.getElementById('statIptal').innerText = iptalSayisi;
+
+        if (randevular.length === 0) {
+            listDiv.innerHTML = '<div class="empty">Henüz alınan randevu yok.</div>';
+            return;
+        }
+
+        randevular.forEach(r => {
+            const isCanceled = r.durum === 'IPTAL';
+            const card = document.createElement('div');
+            card.className = `appt-card ${isCanceled ? 'canceled' : ''}`;
+            card.innerHTML = `
+                <div class="appt-info">
+                    <span class="name">${r.musteri_adi}</span>
+                    <span class="badge ${isCanceled ? 'iptal' : 'aktif'}">${isCanceled ? 'İPTAL' : 'AKTİF'}</span>
+                    <div class="meta">📅 ${r.randevu_tarihi} &nbsp; ⏰ ${r.randevu_saati}</div>
+                </div>
+                ${isCanceled ? '' : `<button class="btn-cancel" onclick="iptalEt(${r.id}, this)">İptal Et</button>`}
+            `;
+            listDiv.appendChild(card);
+        });
+    }
+
+    async function iptalEt(randevuId, btnEl) {
+        if (!confirm('Bu randevuyu iptal etmek istediğinize emin misiniz?')) return;
+
+        btnEl.disabled = true;
+        btnEl.innerText = 'İptal ediliyor...';
+
+        try {
+            const res = await fetch('/api/cancel-appointment', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${getToken()}`
+                },
+                body: JSON.stringify({ randevuId })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                if (data.aiGeneratedMessage) {
+                    document.getElementById('aiMessageBox').style.display = 'block';
+                    document.getElementById('aiMessageText').value = data.aiGeneratedMessage;
+                    document.getElementById('aiMessageBox').scrollIntoView({ behavior: 'smooth' });
+                }
+                loadDashboard();
+            } else {
+                alert('Hata: ' + data.message);
+                btnEl.disabled = false;
+                btnEl.innerText = 'İptal Et';
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Sistemde bir hata oluştu.');
+            btnEl.disabled = false;
+            btnEl.innerText = 'İptal Et';
+        }
+    }
+
+    loadDashboard();
+</script>
+</body>
+</html>
