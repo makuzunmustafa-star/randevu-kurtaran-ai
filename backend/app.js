@@ -82,7 +82,7 @@ app.post('/api/register-business', async (req, res) => {
     }
 });
 
-// API: DÜKKAN DETAYI SORGULAMA (💡 Arayüze Liste Değerini Saf Tek Bir Nesne Olarak İndirgeyip Gönderen Düzeltme)
+// API: DÜKKAN DETAYI SORGULAMA
 app.get('/api/dukkan-detay/:slug', async (req, res) => {
     try {
         const dukkanSlug = req.params.slug;
@@ -94,7 +94,6 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
 
         const randevularSorgu = await pool.query("SELECT id, musteri_adi, randevu_tarihi, randevu_saati FROM randevular WHERE TRIM(LOWER(dukkan_slug)) = TRIM(LOWER($1)) AND durum = 'AKTIF' ORDER BY id DESC", [dukkanSlug]);
         
-        // rows[0] mühürlemesi ile dizinin ilk dükkanını doğrudan tek nesne olarak arayüze teslim ediyoruz!
         res.json({
             success: true,
             dukkan: dukkanSorgu.rows[0], 
@@ -139,13 +138,26 @@ app.post('/api/cancel-appointment', async (req, res) => {
     }
 });
 
+// ⭐ EKLEME: YÖNETİM PANELİ (DASHBOARD) ROTASI
+// Bu sayede ://siteadresi.com yazınca yönetim paneli açılacak.
+app.get('/dashboard/:slug', (req, res) => {
+    // public klasörünün içindeki yönetim paneli HTML dosyanın adı neyse buraya onu yazmalısın. 
+    // Eğer adı 'panel.html' veya 'dashboard.html' ise aşağıdaki 'panel.html' kısmını ona göre güncelle.
+    res.sendFile(path.join(__dirname, 'public', 'panel.html')); 
+});
+
+// DİNAMİK MÜŞTERİ RANDEVU SAYFASI ROTASI
 app.get('/:slug', (req, res) => {
     const dukkanSlug = req.params.slug;
-    if (dukkanSlug.includes('.') || dukkanSlug === 'favicon.ico') return;
+    
+    // Özel kelimelerin slug olarak algılanmasını engelleme filtresi
+    if (dukkanSlug.includes('.') || dukkanSlug === 'favicon.ico' || dukkanSlug === 'dashboard') return res.status(404).end();
+    
     res.sendFile(path.join(__dirname, 'public', 'randevu.html'));
 });
 
 app.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} üzerinde yayında.`));
+
 
 
 
