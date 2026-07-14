@@ -37,7 +37,7 @@
 
 <div class="dashboard">
     <div class="header-area">
-        <h1>🗓️ Randevu Kurtaran Kontrol Merkezi</h1>
+        <h1 id="panelTitle">🗓️ Randevu Kurtaran Kontrol Merkezi</h1>
         <div class="live-indicator">
             <div class="live-dot"></div> Canlı Veri Akışı Aktif
         </div>
@@ -74,47 +74,78 @@
                 </tr>
             </thead>
             <tbody id="liveTableBody">
-                <!-- Veriler arka taraftan otomatik buraya akacak -->
+                <!-- Veriler veritabanından dinamik olarak buraya akacak -->
             </tbody>
         </table>
     </div>
 </div>
 
 <script>
-    async function loadDashboardData() {
-        try {
-            const res = await fetch('http://localhost:3000/api/admin/istatistik');
-            const data = await res.json();
+    // URL yapısından (Örn: /dashboard/berber-mustafa) dükkanın benzersiz ismini (slug) çekiyoruz
+    const urlSegments = window.location.pathname.split('/');
+    const dukkanSlug = urlSegments[urlSegments.length - 1];
 
-            document.getElementById('statTotal').innerText = data.toplamRandevu;
-            document.getElementById('statActive').innerText = data.aktifRandevu;
-            document.getElementById('statCanceled').innerText = data.iptalRandevu;
-            document.getElementById('statEarnings').innerText = data.toplamKazanc + ' TL';
+    async function loadDashboardData() {
+        if (!dukkanSlug) return;
+        try {
+            // Canlı sunucu uyumlu dinamik endpoint bağlantısı
+            const response = await fetch(`/api/dukkan-detay/${dukkanSlug}`);
+            const result = await response.json();
+
+            if (!result.success) {
+                console.error("İşletme verisi çekilemedi.");
+                return;
+            }
+
+            // Başlığı işletme adına göre güncelle
+            if (result.dukkan && result.dukkan.name) {
+                document.getElementById('panelTitle').innerText = `🗓️ ${result.dukkan.name} Kontrol Merkezi`;
+            }
+
+            const randevularListesi = result.randevular || [];
+            
+            // Veritabanı durum değerlerine (durum = 'AKTIF' veya 'IPTAL') göre filtreleme yapıyoruz
+            const aktifRandevular = randevularListesi.filter(item => item.durum !== 'IPTAL');
+            const iptalRandevular = randevularListesi.filter(item => item.durum === 'IPTAL');
+            
+            // Akıllı kazanç motoru simülasyonu (Her aktif randevu için ortalama 300 TL brüt gelir)
+            const toplamGelir = aktifRandevular.length * 300;
+
+            // Kartlardaki sayaçları güncelle
+            document.getElementById('statTotal').innerText = randevularListesi.length;
+            document.getElementById('statActive').innerText = aktifRandevular.length;
+            document.getElementById('statCanceled').innerText = iptalRandevular.length;
+            document.getElementById('statEarnings').innerText = toplamGelir + ' TL';
 
             const tbody = document.getElementById('liveTableBody');
             tbody.innerHTML = '';
 
-            data.randevular.forEach(r => {
-                const badgeClass = r.durum === 'Onaylandı' ? 'success' : 'danger';
-                const statusText = r.durum === 'Onaylandı' ? '🟢 Onaylandı' : '🔴 İptal Edildi';
+            // Tabloyu veritabanındaki PostgreSQL kolon isimlerine göre örüyoruz
+            randevularListesi.forEach(row => {
+                const isItCanceled = row.durum === 'IPTAL';
+                const currentBadge = isItCanceled ? 'danger' : 'success';
+                const currentStatus = isItCanceled ? '🔴 İptal Edildi' : '🟢 Aktif';
+                const dukkanTelefonu = (result.dukkan && result.dukkan.phone) ? result.dukkan.phone : 'Girilmemiş';
+                
                 tbody.innerHTML += `
                     <tr>
-                        <td style="font-weight:700; color:#38bdf8; letter-spacing:0.5px;">${r.id}</td>
-                        <td style="font-weight:600;">${r.isim}</td>
-                        <td style="color:#94a3b8;">${r.telefon}</td>
-                        <td>📅 ${r.tarih} &nbsp;&nbsp; 🕒 ${r.saat}</td>
-                        <td><span class="badge ${badgeClass}">${statusText}</span></td>
+                        <td style="font-weight:700; color:#38bdf8; letter-spacing:0.5px;">#${row.id}</td>
+                        <td style="font-weight:600;">${row.musteri_adi}</td>
+                        <td style="color:#94a3b8;">${dukkanTelefonu}</td>
+                        <td>📅 ${row.randevu_tarihi} &nbsp;&nbsp; 🕒 ${row.randevu_saati}</td>
+                        <td><span class="badge ${currentBadge}">${currentStatus}</span></td>
                     </tr>
                 `;
             });
-        } catch (e) {
-            console.error("Panel verisi güncellenirken hata:", e);
+        } catch (error) {
+            console.error("Yönetim paneli güncellenirken hata oluştu:", error);
         }
     }
 
-    // Ekranı ilk kez yükle ve her 3 saniyede bir otomatik yenile
+    // İlk yüklemeyi başlat ve her 5 saniyede bir verileri arkadan sessizce tazele
     loadDashboardData();
-    setInterval(loadDashboardData, 3000);
+    setInterval(loadDashboardData, 5000);
 </script>
 </body>
 </html>
+
