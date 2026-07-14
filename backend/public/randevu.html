@@ -3,133 +3,140 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Akıllı Randevu Sistemi</title>
+    <title>Randevu Al - Yapay Zeka Akıllı Takvimi</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
-        .card { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.05); text-align: center; max-width: 450px; width: 100%; box-sizing: border-box; }
-        h1 { color: #2c3e50; margin-bottom: 5px; font-size: 26px; }
-        .badge { background: #3498db; color: white; padding: 6px 14px; border-radius: 20px; font-size: 13px; display: inline-block; margin-bottom: 20px; }
-        .section-title { font-weight: bold; margin-top: 20px; margin-bottom: 10px; text-align: left; color: #34495e; font-size: 14px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-        input[type="text"], input[type="date"] { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 15px; margin-bottom: 15px; box-sizing: border-box; }
-        .time-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
-        .time-slot { background: #f8f9fa; border: 2px solid #e2e8f0; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; transition: all 0.2s; }
-        .time-slot:hover { border-color: #3498db; background: #e8f4fd; }
-        .time-slot.selected { background: #3498db; color: white; border-color: #2980b9; }
-        .btn { background: #2ecc71; color: white; padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; margin-top: 10px; }
-        .btn:hover { background: #27ae60; }
-        .appointment-item { background:#fff3cd; padding:10px; border-radius:6px; margin-bottom:8px; font-size:13px; display:flex; justify-content:space-between; align-items:center; border:1px solid #ffeeba; text-align:left; }
-        .cancel-btn { background:#e74c3c; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px; }
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .booking-container { background: #1e293b; padding: 32px; border-radius: 20px; border: 1px solid #334155; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.4); width: 100%; max-width: 450px; }
+        h1 { font-size: 24px; font-weight: 700; margin-bottom: 8px; color: #38bdf8; text-align: center; }
+        .subtitle { font-size: 14px; color: #94a3b8; text-align: center; margin-bottom: 24px; line-height: 1.5; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        input, select { width: 100%; padding: 12px 16px; background: #0f172a; border: 1px solid #334155; border-radius: 10px; color: #f8fafc; font-size: 15px; box-sizing: border-box; outline: none; transition: border-color 0.2s; }
+        input:focus, select:focus { border-color: #38bdf8; }
+        .btn-submit { width: 100%; padding: 14px; background: #38bdf8; color: #0f172a; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; transition: background 0.2s, transform 0.1s; margin-top: 10px; }
+        .btn-submit:hover { background: #0ea5e9; }
+        .btn-submit:active { transform: scale(0.98); }
+        .appointments-list { margin-top: 24px; border-top: 1px solid #334155; padding-top: 20px; }
+        .appointments-list h3 { font-size: 14px; color: #94a3b8; text-transform: uppercase; margin-bottom: 12px; }
+        .appointment-item { background: #0f172a; padding: 10px 14px; border-radius: 8px; font-size: 13px; color: #e2e8f0; margin-bottom: 8px; border-left: 4px solid #34d399; display: flex; justify-content: space-between; }
+        .appointment-item.canceled { border-left-color: #f87171; text-decoration: line-through; color: #64748b; }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h1 id="dukkanAdi">💈 Yükleniyor...</h1>
-    <div id="dukkanSektor" class="badge">...</div>
-    <p style="color: #7f8c8d; font-size: 14px;">Müşteri Paneli: Adınızı yazın, dilediğiniz gün ve saati seçerek anında randevu oluşturun.</p>
+<div class="booking-container">
+    <h1 id="shopName">💈 Yükleniyor...</h1>
+    <p class="subtitle">Müşteri Paneli: Adınızı yazın, dilediğiniz gün ve saati seçerek anında randevu oluşturun.</p>
     
-    <div class="section-title">📅 Güncel Alınan Randevular</div>
-    <div id="randevularListesi" style="max-height:150px; overflow-y:auto; margin-bottom:15px;"></div>
-
     <form id="appointmentForm">
-        <div class="section-title">👤 Yeni Randevu Al</div>
-        <input type="text" id="musteriAdi" placeholder="Örn: Mustafa Uzun" required>
-        
-        <div class="section-title">📅 Randevu Günü Seçin</div>
-        <input type="date" id="randevuTarihi" required>
-        
-        <div class="section-title">⏰ Uygun Saat Seçin</div>
-        <div class="time-grid">
-            <div class="time-slot" onclick="selectTime(this, '09:00')">09:00</div>
-            <div class="time-slot" onclick="selectTime(this, '10:00')">10:00</div>
-            <div class="time-slot" onclick="selectTime(this, '11:00')">11:00</div>
-            <div class="time-slot" onclick="selectTime(this, '13:00')">13:00</div>
-            <div class="time-slot" onclick="selectTime(this, '14:00')">14:00</div>
-            <div class="time-slot" onclick="selectTime(this, '15:00')">15:00</div>
-            <div class="time-slot" onclick="selectTime(this, '16:00')">16:00</div>
-            <div class="time-slot" onclick="selectTime(this, '17:00')">17:00</div>
-            <div class="time-slot" onclick="selectTime(this, '18:00')">18:00</div>
+        <div class="form-group">
+            <label>👤 Adınız Soyadınız</label>
+            <input type="text" id="musteriAdi" placeholder="Örn: Mustafa Uzun" required>
         </div>
         
-        <button type="submit" class="btn">Randevuyu Kesinleştir</button>
+        <div class="form-group">
+            <label>📅 Randevu Günü Seçin</label>
+            <input type="date" id="randevuTarihi" required>
+        </div>
+        
+        <div class="form-group">
+            <label>⏰ Uygun Saat Seçin</label>
+            <select id="randevuSaati" required>
+                <option value="09:00">09:00</option>
+                <option value="10:00">10:00</option>
+                <option value="11:00">11:00</option>
+                <option value="13:00">13:00</option>
+                <option value="14:00">14:00</option>
+                <option value="15:00">15:00</option>
+                <option value="16:00">16:00</option>
+                <option value="17:00">17:00</option>
+                <option value="18:00">18:00</option>
+            </select>
+        </div>
+        
+        <button type="submit" class="btn-submit">Randevuyu Kesinleştir</button>
     </form>
+
+    <div class="appointments-list">
+        <h3>📅 Güncel Alınan Randevular</h3>
+        <div id="liveAppointments">
+            <!-- Mevcut randevular buraya listelenecek -->
+        </div>
+    </div>
 </div>
 
 <script>
-    let selectedTimeSlot = "";
-    const slug = window.location.pathname.split('/').pop();
-    const currentOrigin = window.location.origin;
+    // URL'den işletmenin slug değerini alıyoruz (Örn: /berber-mustafa)
+    const pathSegments = window.location.pathname.split('/');
+    const dukkanSlug = pathSegments[pathSegments.length - 1];
 
-    async function verileriGetir() {
+    // Sayfa açıldığında dükkan detaylarını ve mevcut randevuları çeken fonksiyon
+    async function loadShopDetails() {
+        if (!dukkanSlug) return;
         try {
-            const res = await fetch(`${currentOrigin}/api/dukkan-detay/${slug}`);
+            const res = await fetch(`/api/dukkan-detay/${dukkanSlug}`);
             const data = await res.json();
-            if (!data.success) { document.body.innerHTML = '<h1 style="text-align:center;margin-top:100px;">❌ İşletme Bulunamadı</h1>'; return; }
-            
-            document.getElementById('dukkanAdi').innerText = "💈 " + data.dukkan.name;
-            document.getElementById('dukkanSektor').innerText = data.dukkan.sector;
-            
-            const listContainer = document.getElementById('randevularListesi');
-            listContainer.innerHTML = "";
-            
-            if (data.randevular.length === 0) {
-                listContainer.innerHTML = '<p style="color:#aaa;font-size:12px;text-align:center;">Henüz aktif randevu bulunmuyor.</p>';
+
+            if (data.success && data.dukkan) {
+                // Yükleniyor yazısını veritabanındaki dükkan adıyla değiştiriyoruz
+                document.getElementById('shopName').innerText = `💈 ${data.dukkan.name}`;
+                
+                // Alınan randevuları listeleme
+                const listDiv = document.getElementById('liveAppointments');
+                listDiv.innerHTML = '';
+                
+                if (data.randevular && data.randevular.length > 0) {
+                    data.randevular.forEach(r => {
+                        const isCanceled = r.durum === 'IPTAL';
+                        listDiv.innerHTML += `
+                            <div class="appointment-item ${isCanceled ? 'canceled' : ''}">
+                                <span><strong>${r.musteri_adi}</strong></span>
+                                <span>📅 ${r.randevu_tarihi} - ⏰ ${r.randevu_saati}</span>
+                            </div>
+                        `;
+                    });
+                } else {
+                    listDiv.innerHTML = '<p style="font-size:12px; color:#64748b; margin:0;">Henüz alınan randevu yok. İlk randevuyu siz alın!</p>';
+                }
             } else {
-                data.randevular.forEach(r => {
-                    listContainer.innerHTML += `
-                        <div class="appointment-item">
-                            <span>👤 <b>${r.musteri_adi}</b> - 📅 ${r.randevu_tarihi} ⏰ ${r.randevu_saati}</span>
-                            <button class="cancel-btn" onclick="randevuIptalEt(${r.id})">İptal Et (AI Tetikle)</button>
-                        </div>`;
-                });
+                document.getElementById('shopName').innerText = `❌ İşletme Bulunamadı`;
             }
-        } catch (err) { document.body.innerHTML = '<h1 style="text-align:center;margin-top:100px;">❌ İşletme Bulunamadı</h1>'; }
-    }
-    verileriGetir();
-
-    const today = new Date().toISOString().split('T');
-    document.getElementById('randevuTarihi').setAttribute('min', today);
-
-    function selectTime(element, time) {
-        document.querySelectorAll('.time-slot').forEach(slot => slot.classList.remove('selected'));
-        element.classList.add('selected');
-        selectedTimeSlot = time;
+        } catch (e) {
+            console.error("Dükkan bilgileri yüklenirken hata:", e);
+        }
     }
 
-    document.getElementById('appointmentForm').addEventListener('submit', async function(e) {
+    // Form gönderildiğinde yeni randevu kaydeden fonksiyon
+    document.getElementById('appointmentForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        
         const musteriAdi = document.getElementById('musteriAdi').value;
         const randevuTarihi = document.getElementById('randevuTarihi').value;
-        if (!selectedTimeSlot) { alert("Lütfen bir randevu saati seçin!"); return; }
+        const randevuSaati = document.getElementById('randevuSaati').value;
 
         try {
-            const response = await fetch(`${currentOrigin}/api/book-appointment`, {
+            const res = await fetch('/api/book-appointment', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ dukkanSlug: slug, musteriAdi, randevuTarihi, randevuSaati: selectedTimeSlot })
+                body: JSON.stringify({ dukkanSlug, musteriAdi, randevuTarihi, randevuSaati })
             });
-            const data = await response.json();
-            alert(data.message);
-            if (response.ok) verileriGetir();
-        } catch (error) { alert("Ağ hatası."); }
+            const data = await res.json();
+
+            if (data.success) {
+                alert(data.message);
+                document.getElementById('appointmentForm').reset();
+                loadShopDetails(); // Listeyi güncelle
+            } else {
+                alert("Hata: " + data.message);
+            }
+        } catch (error) {
+            console.error("Randevu kaydedilirken hata:", error);
+            alert("Sistemde bir hata oluştu, lütfen tekrar deneyin.");
+        }
     });
 
-    async function randevuIptalEt(id) {
-        if (!confirm("Bu randevuyu iptal etmek ve Yapay Zeka motorunu devreye sokmak istediğinize emin misiniz?")) return;
-        try {
-            const response = await fetch(`${currentOrigin}/api/cancel-appointment', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ randevuId: id })
-            });
-            const data = await response.json();
-            alert(data.message);
-            if (data.aiGeneratedMessage) {
-                alert("🤖 AI WhatsApp Kurtarma Mesajı Hazırlandı:\n\n" + data.aiGeneratedMessage);
-            }
-            verileriGetir();
-        } catch (err) { alert("İptal motoru bağlantı hatası."); }
-    }
+    // Sayfa yüklenince dükkan verilerini getir
+    loadShopDetails();
 </script>
 </body>
 </html>
