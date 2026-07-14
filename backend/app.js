@@ -12,11 +12,8 @@ const __dirname = path.dirname(__filename);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ⭐ AKILLI STATİK KLASÖR BULUCU
-// HTML dosyalarınızın ana dizinde veya public klasöründe olma ihtimaline karşı çift yönlü koruma:
-const ANA_DIZIN = path.join(__dirname, '..');
-app.use(express.static(ANA_DIZIN));
-app.use(express.static(path.join(ANA_DIZIN, 'public')));
+// ⭐ DOSYA YOLU DÜZELTMESİ: Statik dosyaları backend klasörünün altındaki public'ten sunuyoruz
+app.use(express.static(path.join(__dirname, 'public')));
 
 // BULUT POSTGRESQL BAĞLANTI HAVUZU
 const pool = new pg.Pool({
@@ -87,7 +84,7 @@ app.post('/api/register-business', async (req, res) => {
     }
 });
 
-// API: DÜKKAN DETAYI SORGULAMA
+// API: DÜKKAN DETAYI SORGULAMA (Frontend Nesne Okuma Uyumlu)
 app.get('/api/dukkan-detay/:slug', async (req, res) => {
     try {
         const dukkanSlug = req.params.slug ? req.params.slug.trim().toLowerCase() : '';
@@ -101,7 +98,7 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
         
         return res.json({
             success: true,
-            dukkan: dukkanSorgu.rows[0], 
+            dukkan: dukkanSorgu.rows[0], // Direkt tekil obje veriyoruz (Önemli!)
             randevular: randevularSorgu.rows
         });
     } catch (error) {
@@ -143,38 +140,25 @@ app.post('/api/cancel-appointment', async (req, res) => {
     }
 });
 
-// ⭐ YÖNLENDİRME MOTORU: Dosyayı nerede bulursa oradan dinamik olarak çeken güvenli fonksiyon
-function güvenliDosyaGonder(res, dosyaAdi) {
-    // Önce public klasöründe arar, bulamazsa doğrudan ana dizinde arar
-    const publicYolu = path.join(ANA_DIZIN, 'public', dosyaAdi);
-    const anaDizinYolu = path.join(ANA_DIZIN, dosyaAdi);
-    
-    try {
-        res.sendFile(publicYolu, (err) => {
-            if (err) {
-                res.sendFile(anaDizinYolu, (err2) => {
-                    if (err2) res.status(404).send(`<h3>Hata: ${dosyaAdi} dosyası bulunamadı! Klasör yapınızı kontrol edin.</h3>`);
-                });
-            }
-        });
-    } catch(e) {
-        res.status(500).send("Sunucu içi dosya hatası.");
-    }
-}
+// ROTALAR (backend/public klasörünü hedefler)
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
-// ROTALAR
-app.get('/', (req, res) => güvenliDosyaGonder(res, 'index.html'));
-app.get('/dashboard/:slug', (req, res) => güvenliDosyaGonder(res, 'admin.html'));
+app.get('/dashboard/:slug', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin.html')); 
+});
 
 app.get('/:slug', (req, res) => {
     const dukkanSlug = req.params.slug;
     if (dukkanSlug.includes('.') || dukkanSlug === 'favicon.ico' || dukkanSlug === 'dashboard') {
         return res.status(404).end();
     }
-    güvenliDosyaGonder(res, 'randevu.html');
+    res.sendFile(path.join(__dirname, 'public', 'randevu.html'));
 });
 
 app.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} üzerinde yayında.`));
+
 
 
 
