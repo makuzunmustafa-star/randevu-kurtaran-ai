@@ -249,6 +249,15 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
     }
 });
 
+// Yardımcı: Türkiye cep telefonu formatını doğrular (5XX ile başlayan 10 haneli numara)
+function telefonGecerliMi(telefon) {
+    if (!telefon) return false;
+    let temiz = telefon.replace(/[^0-9]/g, '');
+    if (temiz.startsWith('90') && temiz.length === 12) temiz = temiz.slice(2);
+    if (temiz.startsWith('0') && temiz.length === 11) temiz = temiz.slice(1);
+    return /^5\d{9}$/.test(temiz);
+}
+
 // Yardımcı: Tarihi JS Date objesine çevirir.
 // HTML <input type="date"> tarayıcıda GG.AA.YYYY gösterse bile her zaman YYYY-MM-DD gönderir.
 // DD.MM.YYYY formatı da (elle girilirse) desteklenir, ikisi de kabul edilir.
@@ -283,7 +292,14 @@ function saatiDakikayaCevir(saatStr) {
 app.post('/api/book-appointment', async (req, res) => {
     try {
         const { dukkanSlug, musteriAdi, musteriTelefon, hizmetTuru, ucret, randevuTarihi, randevuSaati } = req.body;
-        if (!dukkanSlug || !musteriAdi || !randevuTarihi || !randevuSaati) return res.status(400).json({ success: false, message: "Eksik veri." });
+        if (!dukkanSlug || !musteriAdi || !musteriTelefon || !randevuTarihi || !randevuSaati) {
+            return res.status(400).json({ success: false, message: "Eksik veri. İsim, telefon, tarih ve saat zorunludur." });
+        }
+
+        // ⭐ TELEFON DOĞRULAMA
+        if (!telefonGecerliMi(musteriTelefon)) {
+            return res.status(422).json({ success: false, message: "Geçersiz telefon numarası. Lütfen 5XX XXX XX XX formatında bir cep telefonu numarası girin." });
+        }
 
         // ⭐ GEÇMİŞ TARİH KONTROLÜ
         const girilenTarih = turkceTarihiParseEt(randevuTarihi);
@@ -327,6 +343,11 @@ app.post('/api/waitlist', async (req, res) => {
         const { dukkanSlug, musteriAdi, musteriTelefon, tercihEdilenHizmet } = req.body;
         if (!dukkanSlug || !musteriAdi || !musteriTelefon) {
             return res.status(400).json({ success: false, message: "İsim, telefon ve dükkan bilgisi zorunludur." });
+        }
+
+        // ⭐ TELEFON DOĞRULAMA
+        if (!telefonGecerliMi(musteriTelefon)) {
+            return res.status(422).json({ success: false, message: "Geçersiz telefon numarası. Lütfen 5XX XXX XX XX formatında bir cep telefonu numarası girin." });
         }
 
         const temizSlug = dukkanSlug.trim().toLowerCase();
