@@ -20,6 +20,7 @@
         .appointments-list h3 { font-size: 14px; color: #94a3b8; text-transform: uppercase; margin-bottom: 12px; }
         .appointment-item { background: #0f172a; padding: 10px 14px; border-radius: 8px; font-size: 13px; color: #e2e8f0; margin-bottom: 8px; border-left: 4px solid #34d399; display: flex; justify-content: space-between; }
         .appointment-item.canceled { border-left-color: #f87171; text-decoration: line-through; color: #64748b; }
+        .hint { font-size: 11px; color: #64748b; margin-top: 6px; }
     </style>
 </head>
 <body>
@@ -27,18 +28,34 @@
 <div class="booking-container">
     <h1 id="shopName">💈 Yükleniyor...</h1>
     <p class="subtitle">Müşteri Paneli: Adınızı yazın, dilediğiniz gün ve saati seçerek anında randevu oluşturun.</p>
-    
+
     <form id="appointmentForm">
         <div class="form-group">
             <label>👤 Adınız Soyadınız</label>
             <input type="text" id="musteriAdi" placeholder="Örn: Mustafa Uzun" required>
         </div>
-        
+
+        <div class="form-group">
+            <label>📱 Telefon Numaranız</label>
+            <input type="tel" id="musteriTelefon" placeholder="Örn: 0532 123 45 67" required>
+            <p class="hint">Randevu iptali veya boşluk durumunda size SMS gönderebilmemiz için gereklidir.</p>
+        </div>
+
+        <div class="form-group">
+            <label>✂️ Hizmet Türü</label>
+            <input type="text" id="hizmetTuru" placeholder="Örn: Saç Kesimi, Sakal Tıraşı">
+        </div>
+
+        <div class="form-group">
+            <label>💰 Hizmet Ücreti (₺)</label>
+            <input type="number" id="ucret" placeholder="Örn: 350" min="0" step="0.01">
+        </div>
+
         <div class="form-group">
             <label>📅 Randevu Günü Seçin</label>
             <input type="date" id="randevuTarihi" required>
         </div>
-        
+
         <div class="form-group">
             <label>⏰ Uygun Saat Seçin</label>
             <select id="randevuSaati" required>
@@ -53,7 +70,7 @@
                 <option value="18:00">18:00</option>
             </select>
         </div>
-        
+
         <button type="submit" class="btn-submit">Randevuyu Kesinleştir</button>
     </form>
 
@@ -88,7 +105,7 @@
             // Hem dizi (array) hem de nesne (object) olarak gelen tüm backend varyasyonlarını destekler:
             if (data.success && data.dukkan) {
                 let dukkanNesnesi = null;
-                
+
                 if (Array.isArray(data.dukkan)) {
                     dukkanNesnesi = data.dukkan[0]; // Eğer array geldiyse ilk elemanı al
                 } else {
@@ -97,10 +114,10 @@
 
                 if (dukkanNesnesi && dukkanNesnesi.name) {
                     document.getElementById('shopName').innerText = `💈 ${dukkanNesnesi.name}`;
-                    
+
                     const listDiv = document.getElementById('liveAppointments');
                     listDiv.innerHTML = '';
-                    
+
                     const randevularListesi = data.randevular || [];
                     if (randevularListesi.length > 0) {
                         randevularListesi.forEach(r => {
@@ -129,8 +146,11 @@
 
     document.getElementById('appointmentForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         const musteriAdi = document.getElementById('musteriAdi').value;
+        const musteriTelefon = document.getElementById('musteriTelefon').value;
+        const hizmetTuru = document.getElementById('hizmetTuru').value;
+        const ucret = document.getElementById('ucret').value;
         const randevuTarihi = document.getElementById('randevuTarihi').value;
         const randevuSaati = document.getElementById('randevuSaati').value;
 
@@ -138,7 +158,15 @@
             const res = await fetch('/api/book-appointment', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ dukkanSlug, musteriAdi, randevuTarihi, randevuSaati })
+                body: JSON.stringify({
+                    dukkanSlug,
+                    musteriAdi,
+                    musteriTelefon,
+                    hizmetTuru: hizmetTuru || null,
+                    ucret: ucret ? parseFloat(ucret) : null,
+                    randevuTarihi,
+                    randevuSaati
+                })
             });
             const data = await res.json();
 
