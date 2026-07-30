@@ -100,7 +100,7 @@ async function tabloyuHazirla() {
             ALTER TABLE randevular ADD COLUMN IF NOT EXISTS ucret NUMERIC(10, 2);
         `);
 
-        // ⭐ YENİ: Bekleme listesi tablosu
+        // ⭐ Bekleme listesi tablosu
         await pool.query(`
             CREATE TABLE IF NOT EXISTS bekleme_listesi (
                 id SERIAL PRIMARY KEY,
@@ -320,7 +320,6 @@ app.delete('/api/waitlist/:slug/:id', panelYetkisiKontrolEt, async (req, res) =>
 
         await pool.query('DELETE FROM bekleme_listesi WHERE id = $1 AND dukkan_slug = $2', [id, dukkanSlug]);
 
-        // Kalan sıra numaralarını yeniden düzenle (silinenden sonrakileri 1 geri kaydır)
         await pool.query(
             'UPDATE bekleme_listesi SET sira_no = sira_no - 1 WHERE dukkan_slug = $1 AND sira_no > $2',
             [dukkanSlug, silinenSira]
@@ -357,6 +356,8 @@ app.post('/api/cancel-appointment', async (req, res) => {
 
         await pool.query('UPDATE randevular SET durum = \'IPTAL\' WHERE id = $1', [randevuId]);
 
+        const dukkanSlugTemiz = iptalEdilen.dukkan_slug.trim().toLowerCase();
+
         const aiMesaj = `💈 *${iptalEdilen.randevu_saati} Seansı Boşaldı!* 💈\n\nMerhaba değerli müşterimiz, dükkanımızda sıra beklediğiniz o gün için az önce acil bir iptal gerçekleşti ve koltuğumuz boşa çıktı! 😎\n\nYapay zeka takvim kontrol motoru sırayı size atadı. Randevuyu kapmak için hemen bu mesaja yanıt verebilirsiniz! 📲✨`;
 
         // ⭐ OTOMATİK SMS: İşletme sahibinin telefonuna gönder
@@ -365,11 +366,11 @@ app.post('/api/cancel-appointment', async (req, res) => {
 
         if (twilioClient) {
             try {
-                const dukkanSorgu = await pool.query('SELECT phone FROM dukkanlar WHERE LOWER(TRIM(slug)) = $1', [iptalEdilen.dukkan_slug.trim().toLowerCase()]);
+                const dukkanSorgu = await pool.query('SELECT phone FROM dukkanlar WHERE LOWER(TRIM(slug)) = $1', [dukkanSlugTemiz]);
                 if (dukkanSorgu.rows.length > 0) {
                     const sahibiTelefon = telefonuE164Yap(dukkanSorgu.rows[0].phone);
                     await twilioClient.messages.create({
-                        body: aiMesaj.replace(/\*/g, ''), // SMS'te yıldız işaretleri anlamsız, temizle
+                        body: aiMesaj.replace(/\*/g, ''),
                         from: TWILIO_PHONE_NUMBER,
                         to: sahibiTelefon
                     });
@@ -377,8 +378,50 @@ app.post('/api/cancel-appointment', async (req, res) => {
                 }
             } catch (err) {
                 smsHata = err.message;
-                console.error('❌ SMS gönderim hatası:', err.message);
+                console.error('❌ SMS gönderim hatası (işletme sahibi):', err.message);
             }
+        }
+
+        // ⭐ YENİ: Bekleme listesindeki ilk sıradaki müşteriye de gerçek SMS gönder
+        let bekleyenMusteri = null;
+        let bekleyenSmsGonderildi = false;
+        let bekleyenSmsHata = null;
+
+        try {
+            const bekleyenSorgu = await pool.query(
+                'SELECT * FROM bekleme_listesi WHERE dukkan_slug = $1 ORDER BY sira_no ASC LIMIT 1',
+                [dukkanSlugTemiz]
+            );
+
+            if (bekleyenSorgu.rows.length > 0) {
+                bekleyenMusteri = bekleyenSorgu.rows[0];
+
+                const musteriMesaji = `💈 Merhaba ${bekleyenMusteri.musteri_adi}, bekleme listesinde olduğunuz ${iptalEdilen.hizmet_turu || 'hizmet'} için ${iptalEdilen.randevu_tarihi} tarihinde saat ${iptalEdilen.randevu_saati}'de bir iptal nedeniyle boşluk açıldı! Bu randevuyu almak isterseniz lütfen işletmeyi arayarak onaylayın.`;
+
+                if (twilioClient) {
+                    try {
+                        const musteriTelefonE164 = telefonuE164Yap(bekleyenMusteri.musteri_telefon);
+                        await twilioClient.messages.create({
+                            body: musteriMesaji,
+                            from: TWILIO_PHONE_NUMBER,
+                            to: musteriTelefonE164
+                        });
+                        bekleyenSmsGonderildi = true;
+
+                        // SMS başarıyla gittiyse, bekleyen kişiyi listeden çıkar ve sırayı düzenle
+                        await pool.query('DELETE FROM bekleme_listesi WHERE id = $1', [bekleyenMusteri.id]);
+                        await pool.query(
+                            'UPDATE bekleme_listesi SET sira_no = sira_no - 1 WHERE dukkan_slug = $1 AND sira_no > $2',
+                            [dukkanSlugTemiz, bekleyenMusteri.sira_no]
+                        );
+                    } catch (err) {
+                        bekleyenSmsHata = err.message;
+                        console.error('❌ SMS gönderim hatası (bekleyen müşteri):', err.message);
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('❌ Bekleme listesi kontrol hatası:', err.message);
         }
 
         res.json({
@@ -388,7 +431,10 @@ app.post('/api/cancel-appointment', async (req, res) => {
                 : "⚠️ Randevu iptal edildi. Yapay zeka davet mesajını üretti (SMS gönderilemedi).",
             aiGeneratedMessage: aiMesaj,
             smsGonderildi,
-            smsHata
+            smsHata,
+            bekleyenMusteriBulundu: !!bekleyenMusteri,
+            bekleyenSmsGonderildi,
+            bekleyenSmsHata
         });
     } catch (error) {
         res.status(500).json({ success: false, message: "Hata." });
