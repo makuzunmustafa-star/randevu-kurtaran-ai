@@ -90,6 +90,17 @@ async function tabloyuHazirla() {
             ALTER TABLE randevular ADD COLUMN IF NOT EXISTS durum VARCHAR(50) DEFAULT 'AKTIF';
         `);
 
+        // ⭐ YENİ: müşteri telefonu, hizmet türü ve ücret alanları
+        await pool.query(`
+            ALTER TABLE randevular ADD COLUMN IF NOT EXISTS musteri_telefon VARCHAR(50);
+        `);
+        await pool.query(`
+            ALTER TABLE randevular ADD COLUMN IF NOT EXISTS hizmet_turu VARCHAR(255);
+        `);
+        await pool.query(`
+            ALTER TABLE randevular ADD COLUMN IF NOT EXISTS ucret NUMERIC(10, 2);
+        `);
+
         console.log('✅ Canlı PostgreSQL Altyapısı Başarıyla Kuruldu.');
     } catch (err) {
         console.error('❌ Altyapı kurulum hatası:', err.message);
@@ -192,7 +203,7 @@ app.get('/api/dashboard-data/:slug', panelYetkisiKontrolEt, async (req, res) => 
             return res.status(404).json({ success: false, message: "İşletme bulunamadı." });
         }
 
-        const randevularSorgu = await pool.query("SELECT id, musteri_adi, randevu_tarihi, randevu_saati, durum FROM randevular WHERE LOWER(TRIM(dukkan_slug)) = $1 ORDER BY id DESC", [dukkanSlug]);
+        const randevularSorgu = await pool.query("SELECT id, musteri_adi, musteri_telefon, hizmet_turu, ucret, randevu_tarihi, randevu_saati, durum FROM randevular WHERE LOWER(TRIM(dukkan_slug)) = $1 ORDER BY id DESC", [dukkanSlug]);
 
         return res.json({
             success: true,
@@ -214,7 +225,7 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
             return res.status(404).json({ success: false, message: "İşletme bulunamadı." });
         }
 
-        const randevularSorgu = await pool.query("SELECT id, musteri_adi, randevu_tarihi, randevu_saati, durum FROM randevular WHERE LOWER(TRIM(dukkan_slug)) = $1 ORDER BY id DESC", [dukkanSlug]);
+        const randevularSorgu = await pool.query("SELECT id, musteri_adi, musteri_telefon, hizmet_turu, ucret, randevu_tarihi, randevu_saati, durum FROM randevular WHERE LOWER(TRIM(dukkan_slug)) = $1 ORDER BY id DESC", [dukkanSlug]);
 
         return res.json({
             success: true,
@@ -229,12 +240,12 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
 // API: RANDEVU KAYDETME
 app.post('/api/book-appointment', async (req, res) => {
     try {
-        const { dukkanSlug, musteriAdi, randevuTarihi, randevuSaati } = req.body;
+        const { dukkanSlug, musteriAdi, musteriTelefon, hizmetTuru, ucret, randevuTarihi, randevuSaati } = req.body;
         if (!dukkanSlug || !musteriAdi || !randevuTarihi || !randevuSaati) return res.status(400).json({ success: false, message: "Eksik veri." });
 
         await pool.query(
-            'INSERT INTO randevular (dukkan_slug, musteri_adi, randevu_tarihi, randevu_saati) VALUES ($1, $2, $3, $4)',
-            [dukkanSlug.trim().toLowerCase(), musteriAdi, randevuTarihi, randevuSaati]
+            'INSERT INTO randevular (dukkan_slug, musteri_adi, musteri_telefon, hizmet_turu, ucret, randevu_tarihi, randevu_saati) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+            [dukkanSlug.trim().toLowerCase(), musteriAdi, musteriTelefon || null, hizmetTuru || null, ucret || null, randevuTarihi, randevuSaati]
         );
         res.json({ success: true, message: "🎉 Randevunuz başarıyla alındı! Yapay zeka koltuğunuzu ayırdı." });
     } catch (error) {
@@ -317,7 +328,6 @@ app.get('/:slug', (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} üzerinde yayında.`));
-
 
 
 
