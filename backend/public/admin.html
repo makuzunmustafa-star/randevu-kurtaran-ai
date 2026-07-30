@@ -30,6 +30,18 @@
         .btn-copy { background: #38bdf8; color: #0f172a; border: none; padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; margin-top: 8px; }
         .customer-link-box { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 14px; margin-bottom: 20px; font-size: 13px; word-break: break-all; }
         .customer-link-box a { color: #38bdf8; }
+        .services-box { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+        .services-box h3 { margin-top: 0; font-size: 14px; color: #38bdf8; }
+        .service-item { display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; font-size: 13px; }
+        .service-item .price { color: #34d399; font-weight: 700; margin-left: 8px; }
+        .btn-delete-service { background: #450a0a; color: #f87171; border: none; padding: 6px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+        .btn-delete-service:hover { background: #7f1d1d; }
+        .add-service-form { display: flex; gap: 8px; margin-top: 12px; }
+        .add-service-form input { background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #f8fafc; padding: 10px; font-size: 13px; box-sizing: border-box; }
+        .add-service-form input#newServiceName { flex: 2; }
+        .add-service-form input#newServicePrice { flex: 1; }
+        .btn-add-service { background: #38bdf8; color: #0f172a; border: none; padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+        .empty-services { font-size: 12px; color: #64748b; }
         .login-box { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 32px; max-width: 380px; margin: 60px auto 0; }
         .login-box h2 { color: #38bdf8; text-align: center; margin-top: 0; font-size: 20px; }
         .login-box label { display: block; font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 8px; }
@@ -78,6 +90,16 @@
 
         <div class="customer-link-box">
             👉 Müşteri Randevu Linkiniz: <a id="customerLink" href="#" target="_blank">Yükleniyor...</a>
+        </div>
+
+        <div class="services-box">
+            <h3>✂️ Hizmetlerim</h3>
+            <div id="servicesList"></div>
+            <form id="addServiceForm" class="add-service-form">
+                <input type="text" id="newServiceName" placeholder="Hizmet adı (Örn: Saç Kesimi)" required>
+                <input type="number" id="newServicePrice" placeholder="₺" min="0" step="0.01" required>
+                <button type="submit" class="btn-add-service">Ekle</button>
+            </form>
         </div>
 
         <div class="ai-message-box" id="aiMessageBox">
@@ -230,9 +252,83 @@
             linkEl.href = customerUrl;
 
             renderAppointments(data.randevular || []);
+            loadServices();
         } catch (e) {
             console.error(e);
             document.getElementById('shopName').innerText = '❌ Bağlantı Hatası';
+        }
+    }
+
+    async function loadServices() {
+        const listDiv = document.getElementById('servicesList');
+        try {
+            const res = await fetch(`/api/hizmetler/${dukkanSlug}`);
+            const data = await res.json();
+
+            listDiv.innerHTML = '';
+            if (data.success && data.hizmetler && data.hizmetler.length > 0) {
+                data.hizmetler.forEach(h => {
+                    const item = document.createElement('div');
+                    item.className = 'service-item';
+                    item.innerHTML = `
+                        <span>${h.hizmet_adi} <span class="price">${h.ucret}₺</span></span>
+                        <button class="btn-delete-service" onclick="hizmetSil(${h.id})">Sil</button>
+                    `;
+                    listDiv.appendChild(item);
+                });
+            } else {
+                listDiv.innerHTML = '<div class="empty-services">Henüz hizmet eklemediniz. Aşağıdan ekleyebilirsiniz.</div>';
+            }
+        } catch (e) {
+            console.error(e);
+            listDiv.innerHTML = '<div class="empty-services">Hizmetler yüklenemedi.</div>';
+        }
+    }
+
+    document.getElementById('addServiceForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const hizmetAdi = document.getElementById('newServiceName').value;
+        const ucret = document.getElementById('newServicePrice').value;
+
+        try {
+            const res = await fetch(`/api/hizmetler/${dukkanSlug}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${getToken()}`
+                },
+                body: JSON.stringify({ hizmetAdi, ucret })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                document.getElementById('addServiceForm').reset();
+                loadServices();
+            } else {
+                alert('Hata: ' + data.message);
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Hizmet eklenirken bir hata oluştu.');
+        }
+    });
+
+    async function hizmetSil(id) {
+        if (!confirm('Bu hizmeti silmek istediğinize emin misiniz?')) return;
+        try {
+            const res = await fetch(`/api/hizmetler/${dukkanSlug}/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            const data = await res.json();
+            if (data.success) {
+                loadServices();
+            } else {
+                alert('Hata: ' + data.message);
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Hizmet silinirken bir hata oluştu.');
         }
     }
 
