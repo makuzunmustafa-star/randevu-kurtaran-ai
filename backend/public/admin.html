@@ -37,6 +37,15 @@
         .login-box .btn-login { width: 100%; padding: 14px; background: #38bdf8; color: #0f172a; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; }
         .login-error { color: #f87171; font-size: 13px; text-align: center; margin-top: 10px; display: none; }
         #dashboardContent { display: none; }
+        .forgot-link { display: block; text-align: center; margin-top: 16px; font-size: 13px; color: #38bdf8; cursor: pointer; text-decoration: underline; background: none; border: none; }
+        #forgotBox { display: none; margin-top: 16px; padding-top: 16px; border-top: 1px solid #334155; }
+        #forgotBox label { display: block; font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 8px; }
+        #forgotBox input { width: 100%; padding: 12px 16px; background: #0f172a; border: 1px solid #334155; border-radius: 10px; color: #f8fafc; font-size: 15px; box-sizing: border-box; margin-bottom: 12px; }
+        .btn-forgot-submit { width: 100%; padding: 12px; background: #334155; color: #f8fafc; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; }
+        .btn-forgot-submit:hover { background: #475569; }
+        .forgot-result { font-size: 13px; text-align: center; margin-top: 10px; display: none; }
+        .forgot-result.ok { color: #34d399; }
+        .forgot-result.err { color: #f87171; }
     </style>
 </head>
 <body>
@@ -50,6 +59,17 @@
             <button type="submit" class="btn-login">Giriş Yap</button>
             <div class="login-error" id="loginError">Şifre hatalı, lütfen tekrar deneyin.</div>
         </form>
+
+        <button type="button" class="forgot-link" id="forgotToggle">Panel Linkimi/Adresimi Unuttum</button>
+
+        <div id="forgotBox">
+            <form id="forgotForm">
+                <label>Kayıtlı Telefon Numaranız</label>
+                <input type="tel" id="forgotPhone" placeholder="Örn: 05551234567" required>
+                <button type="submit" class="btn-forgot-submit">Panel Linkimi SMS ile Gönder</button>
+            </form>
+            <div class="forgot-result" id="forgotResult"></div>
+        </div>
     </div>
 
     <div id="dashboardContent">
@@ -102,6 +122,44 @@
         document.execCommand('copy');
         alert('Mesaj kopyalandı! Şimdi WhatsApp veya SMS uygulamanıza yapıştırabilirsiniz.');
     }
+
+    // ⭐ "Panel Linkimi Unuttum" kutusunu aç/kapa
+    document.getElementById('forgotToggle').addEventListener('click', () => {
+        const box = document.getElementById('forgotBox');
+        box.style.display = box.style.display === 'block' ? 'none' : 'block';
+    });
+
+    // ⭐ Telefonla panel linki isteme
+    document.getElementById('forgotForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const phone = document.getElementById('forgotPhone').value;
+        const resultEl = document.getElementById('forgotResult');
+        const submitBtn = e.target.querySelector('button');
+
+        resultEl.style.display = 'none';
+        submitBtn.disabled = true;
+        submitBtn.innerText = 'Gönderiliyor...';
+
+        try {
+            const res = await fetch('/api/find-my-panel', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone })
+            });
+            const data = await res.json();
+
+            resultEl.className = 'forgot-result ' + (data.success ? 'ok' : 'err');
+            resultEl.innerText = data.message;
+            resultEl.style.display = 'block';
+        } catch (err) {
+            resultEl.className = 'forgot-result err';
+            resultEl.innerText = 'Bağlantı hatası oluştu.';
+            resultEl.style.display = 'block';
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerText = 'Panel Linkimi SMS ile Gönder';
+        }
+    });
 
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
         e.preventDefault();
