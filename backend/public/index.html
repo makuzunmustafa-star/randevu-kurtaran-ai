@@ -48,7 +48,32 @@
                 <select id="sectorType" required>
                     <option value="Berber / Erkek Kuaförü">Berber / Erkek Kuaförü</option>
                     <option value="Güzellik & Saç Salonu">Güzellik & Saç Salonu</option>
+                    <option value="Nail Art / Manikür-Pedikür">Nail Art / Manikür-Pedikür</option>
+                    <option value="Cilt Bakımı & Estetik">Cilt Bakımı & Estetik</option>
+                    <option value="Spa & Masaj Merkezi">Spa & Masaj Merkezi</option>
+                    <option value="Dövme / Piercing Stüdyosu">Dövme / Piercing Stüdyosu</option>
+                    <option value="Diş Kliniği">Diş Kliniği</option>
+                    <option value="Fizyoterapi / Rehabilitasyon">Fizyoterapi / Rehabilitasyon</option>
+                    <option value="Psikolog / Danışmanlık">Psikolog / Danışmanlık</option>
+                    <option value="Diyetisyen / Beslenme Danışmanlığı">Diyetisyen / Beslenme Danışmanlığı</option>
+                    <option value="Veterinerlik Kliniği">Veterinerlik Kliniği</option>
+                    <option value="Fitness / Kişisel Antrenörlük">Fitness / Kişisel Antrenörlük</option>
+                    <option value="Yoga & Pilates Stüdyosu">Yoga & Pilates Stüdyosu</option>
+                    <option value="Oto Yıkama & Bakım">Oto Yıkama & Bakım</option>
+                    <option value="Eğitim / Özel Ders / Kurs">Eğitim / Özel Ders / Kurs</option>
+                    <option value="Müzik Kursu / Enstrüman Dersi">Müzik Kursu / Enstrüman Dersi</option>
+                    <option value="Avukatlık Bürosu">Avukatlık Bürosu</option>
+                    <option value="Mali Müşavirlik / Muhasebe">Mali Müşavirlik / Muhasebe</option>
+                    <option value="Emlak Danışmanlığı">Emlak Danışmanlığı</option>
+                    <option value="Temizlik Hizmetleri">Temizlik Hizmetleri</option>
+                    <option value="Fotoğrafçılık Stüdyosu">Fotoğrafçılık Stüdyosu</option>
+                    <option value="Diğer">Diğer</option>
                 </select>
+            </div>
+
+            <div class="form-group" id="otherSectorGroup" style="display:none;">
+                <label for="otherSectorText">Sektörünüzü Belirtin</label>
+                <input type="text" id="otherSectorText" placeholder="Örn: Kuru Temizleme">
             </div>
 
             <div class="form-group">
@@ -82,6 +107,18 @@
 </div>
 
 <script>
+    // "Diğer" seçilirse serbest metin alanını göster
+    document.getElementById('sectorType').addEventListener('change', function() {
+        const otherGroup = document.getElementById('otherSectorGroup');
+        if (this.value === 'Diğer') {
+            otherGroup.style.display = 'block';
+            document.getElementById('otherSectorText').required = true;
+        } else {
+            otherGroup.style.display = 'none';
+            document.getElementById('otherSectorText').required = false;
+        }
+    });
+
     document.getElementById('registerForm').addEventListener('submit', async function(e) {
         e.preventDefault();
 
@@ -90,9 +127,17 @@
         submitBtn.disabled = true;
 
         const companyName = document.getElementById('companyName').value;
-        const sectorType = document.getElementById('sectorType').value;
+        let sectorType = document.getElementById('sectorType').value;
         const phone = document.getElementById('phone').value;
         const password = document.getElementById('password').value;
+
+        // "Diğer" seçildiyse, kullanıcının yazdığı serbest metni kullan
+        if (sectorType === 'Diğer') {
+            const ozelSektor = document.getElementById('otherSectorText').value.trim();
+            if (ozelSektor) {
+                sectorType = ozelSektor;
+            }
+        }
 
         try {
             const response = await fetch(`${window.location.origin}/api/register-business`, {
@@ -133,4 +178,3 @@
 
 </body>
 </html>
-
