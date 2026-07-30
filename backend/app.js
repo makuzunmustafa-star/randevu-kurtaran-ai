@@ -249,15 +249,58 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
     }
 });
 
+// Yardımcı: DD.MM.YYYY formatındaki tarihi JS Date objesine çevirir
+function turkceTarihiParseEt(tarihStr) {
+    if (!tarihStr) return null;
+    const parcalar = tarihStr.split('.');
+    if (parcalar.length !== 3) return null;
+    const [gun, ay, yil] = parcalar.map(p => parseInt(p, 10));
+    if (!gun || !ay || !yil) return null;
+    return new Date(yil, ay - 1, gun);
+}
+
+// Yardımcı: "HH:MM" formatındaki saati dakikaya çevirir (basit karşılaştırma için)
+function saatiDakikayaCevir(saatStr) {
+    if (!saatStr) return 0;
+    const [saat, dakika] = saatStr.split(':').map(p => parseInt(p, 10));
+    return (saat || 0) * 60 + (dakika || 0);
+}
+
 // API: RANDEVU KAYDETME
 app.post('/api/book-appointment', async (req, res) => {
     try {
         const { dukkanSlug, musteriAdi, musteriTelefon, hizmetTuru, ucret, randevuTarihi, randevuSaati } = req.body;
         if (!dukkanSlug || !musteriAdi || !randevuTarihi || !randevuSaati) return res.status(400).json({ success: false, message: "Eksik veri." });
 
+        // ⭐ GEÇMİŞ TARİH KONTROLÜ
+        const girilenTarih = turkceTarihiParseEt(randevuTarihi);
+        if (!girilenTarih) {
+            return res.status(422).json({ success: false, message: "Tarih formatı geçersiz. Beklenen format: GG.AA.YYYY" });
+        }
+
+        const bugun = new Date();
+        bugun.setHours(0, 0, 0, 0);
+
+        const girilenGun = new Date(girilenTarih);
+        girilenGun.setHours(0, 0, 0, 0);
+
+        if (girilenGun < bugun) {
+            return res.status(422).json({ success: false, message: "Geçmiş bir tarihe randevu oluşturulamaz." });
+        }
+
+        // ⭐ ÇAKIŞMA KONTROLÜ (aynı dükkan + aynı tarih + aynı saat, aktif randevular arasında)
+        const temizSlug = dukkanSlug.trim().toLowerCase();
+        const cakismaSorgu = await pool.query(
+            "SELECT id FROM randevular WHERE LOWER(TRIM(dukkan_slug)) = $1 AND randevu_tarihi = $2 AND randevu_saati = $3 AND durum = 'AKTIF'",
+            [temizSlug, randevuTarihi, randevuSaati]
+        );
+        if (cakismaSorgu.rows.length > 0) {
+            return res.status(409).json({ success: false, message: "Bu tarih ve saatte zaten aktif bir randevu var. Lütfen başka bir saat seçin." });
+        }
+
         await pool.query(
             'INSERT INTO randevular (dukkan_slug, musteri_adi, musteri_telefon, hizmet_turu, ucret, randevu_tarihi, randevu_saati) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-            [dukkanSlug.trim().toLowerCase(), musteriAdi, musteriTelefon || null, hizmetTuru || null, ucret || null, randevuTarihi, randevuSaati]
+            [temizSlug, musteriAdi, musteriTelefon || null, hizmetTuru || null, ucret || null, randevuTarihi, randevuSaati]
         );
         res.json({ success: true, message: "🎉 Randevunuz başarıyla alındı! Yapay zeka koltuğunuzu ayırdı." });
     } catch (error) {
