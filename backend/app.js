@@ -90,7 +90,6 @@ async function tabloyuHazirla() {
             ALTER TABLE randevular ADD COLUMN IF NOT EXISTS durum VARCHAR(50) DEFAULT 'AKTIF';
         `);
 
-        // ⭐ YENİ: müşteri telefonu, hizmet türü ve ücret alanları
         await pool.query(`
             ALTER TABLE randevular ADD COLUMN IF NOT EXISTS musteri_telefon VARCHAR(50);
         `);
@@ -99,6 +98,19 @@ async function tabloyuHazirla() {
         `);
         await pool.query(`
             ALTER TABLE randevular ADD COLUMN IF NOT EXISTS ucret NUMERIC(10, 2);
+        `);
+
+        // ⭐ YENİ: Bekleme listesi tablosu
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS bekleme_listesi (
+                id SERIAL PRIMARY KEY,
+                dukkan_slug VARCHAR(255) NOT NULL,
+                musteri_adi VARCHAR(255) NOT NULL,
+                musteri_telefon VARCHAR(50) NOT NULL,
+                tercih_edilen_hizmet VARCHAR(255),
+                sira_no INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
         `);
 
         console.log('✅ Canlı PostgreSQL Altyapısı Başarıyla Kuruldu.');
@@ -205,129 +217,7 @@ app.get('/api/dashboard-data/:slug', panelYetkisiKontrolEt, async (req, res) => 
 
         const randevularSorgu = await pool.query("SELECT id, musteri_adi, musteri_telefon, hizmet_turu, ucret, randevu_tarihi, randevu_saati, durum FROM randevular WHERE LOWER(TRIM(dukkan_slug)) = $1 ORDER BY id DESC", [dukkanSlug]);
 
-        return res.json({
-            success: true,
-            dukkan: dukkanSorgu.rows[0],
-            randevular: randevularSorgu.rows
-        });
-    } catch (error) {
-        return res.status(500).json({ success: false, message: error.message });
-    }
-});
-
-// API: DÜKKAN DETAYI (Müşteri tarafı, açık erişim)
-app.get('/api/dukkan-detay/:slug', async (req, res) => {
-    try {
-        const dukkanSlug = req.params.slug ? req.params.slug.trim().toLowerCase() : '';
-        const dukkanSorgu = await pool.query("SELECT name, sector, phone, slug FROM dukkanlar WHERE LOWER(TRIM(slug)) = $1", [dukkanSlug]);
-
-        if (dukkanSorgu.rows.length === 0) {
-            return res.status(404).json({ success: false, message: "İşletme bulunamadı." });
-        }
-
-        const randevularSorgu = await pool.query("SELECT id, musteri_adi, musteri_telefon, hizmet_turu, ucret, randevu_tarihi, randevu_saati, durum FROM randevular WHERE LOWER(TRIM(dukkan_slug)) = $1 ORDER BY id DESC", [dukkanSlug]);
-
-        return res.json({
-            success: true,
-            dukkan: dukkanSorgu.rows[0],
-            randevular: randevularSorgu.rows
-        });
-    } catch (error) {
-        return res.status(500).json({ success: false, message: error.message });
-    }
-});
-
-// API: RANDEVU KAYDETME
-app.post('/api/book-appointment', async (req, res) => {
-    try {
-        const { dukkanSlug, musteriAdi, musteriTelefon, hizmetTuru, ucret, randevuTarihi, randevuSaati } = req.body;
-        if (!dukkanSlug || !musteriAdi || !randevuTarihi || !randevuSaati) return res.status(400).json({ success: false, message: "Eksik veri." });
-
-        await pool.query(
-            'INSERT INTO randevular (dukkan_slug, musteri_adi, musteri_telefon, hizmet_turu, ucret, randevu_tarihi, randevu_saati) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-            [dukkanSlug.trim().toLowerCase(), musteriAdi, musteriTelefon || null, hizmetTuru || null, ucret || null, randevuTarihi, randevuSaati]
-        );
-        res.json({ success: true, message: "🎉 Randevunuz başarıyla alındı! Yapay zeka koltuğunuzu ayırdı." });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Hata." });
-    }
-});
-
-// API: YAPAY ZEKA İPTAL MOTORU (Şifre korumalı + otomatik SMS)
-app.post('/api/cancel-appointment', async (req, res) => {
-    try {
-        const { randevuId } = req.body;
-
-        const randevuSorgu = await pool.query('SELECT * FROM randevular WHERE id = $1', [randevuId]);
-        if (randevuSorgu.rows.length === 0) return res.status(404).json({ success: false, message: "Bulunamadı." });
-
-        const iptalEdilen = randevuSorgu.rows[0];
-
-        const authHeader = req.headers['authorization'] || '';
-        const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-        if (!token) return res.status(401).json({ success: false, message: "Giriş yapmanız gerekiyor." });
-
-        try {
-            const payload = jwt.verify(token, JWT_SECRET);
-            if (payload.slug !== iptalEdilen.dukkan_slug.trim().toLowerCase()) {
-                return res.status(403).json({ success: false, message: "Bu işlemi yapma yetkiniz yok." });
-            }
-        } catch (err) {
-            return res.status(401).json({ success: false, message: "Oturum geçersiz veya süresi dolmuş." });
-        }
-
-        await pool.query('UPDATE randevular SET durum = \'IPTAL\' WHERE id = $1', [randevuId]);
-
-        const aiMesaj = `💈 *${iptalEdilen.randevu_saati} Seansı Boşaldı!* 💈\n\nMerhaba değerli müşterimiz, dükkanımızda sıra beklediğiniz o gün için az önce acil bir iptal gerçekleşti ve koltuğumuz boşa çıktı! 😎\n\nYapay zeka takvim kontrol motoru sırayı size atadı. Randevuyu kapmak için hemen bu mesaja yanıt verebilirsiniz! 📲✨`;
-
-        // ⭐ OTOMATİK SMS: İşletme sahibinin telefonuna gönder
-        let smsGonderildi = false;
-        let smsHata = null;
-
-        if (twilioClient) {
-            try {
-                const dukkanSorgu = await pool.query('SELECT phone FROM dukkanlar WHERE LOWER(TRIM(slug)) = $1', [iptalEdilen.dukkan_slug.trim().toLowerCase()]);
-                if (dukkanSorgu.rows.length > 0) {
-                    const sahibiTelefon = telefonuE164Yap(dukkanSorgu.rows[0].phone);
-                    await twilioClient.messages.create({
-                        body: aiMesaj.replace(/\*/g, ''), // SMS'te yıldız işaretleri anlamsız, temizle
-                        from: TWILIO_PHONE_NUMBER,
-                        to: sahibiTelefon
-                    });
-                    smsGonderildi = true;
-                }
-            } catch (err) {
-                smsHata = err.message;
-                console.error('❌ SMS gönderim hatası:', err.message);
-            }
-        }
-
-        res.json({
-            success: true,
-            message: smsGonderildi
-                ? "⚠️ Randevu iptal edildi. SMS işletme sahibinin telefonuna gönderildi!"
-                : "⚠️ Randevu iptal edildi. Yapay zeka davet mesajını üretti (SMS gönderilemedi).",
-            aiGeneratedMessage: aiMesaj,
-            smsGonderildi,
-            smsHata
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Hata." });
-    }
-});
-
-// ROTALAR
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('/dashboard/:slug', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
-app.get('/:slug', (req, res) => {
-    const dukkanSlug = req.params.slug;
-    if (dukkanSlug.includes('.') || dukkanSlug === 'favicon.ico' || dukkanSlug === 'dashboard') {
-        return res.status(404).end();
-    }
-    res.sendFile(path.join(__dirname, 'public', 'randevu.html'));
-});
-
-app.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} üzerinde yayında.`));
+        return
 
 
 
