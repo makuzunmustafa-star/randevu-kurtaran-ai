@@ -249,14 +249,27 @@ app.get('/api/dukkan-detay/:slug', async (req, res) => {
     }
 });
 
-// Yardımcı: DD.MM.YYYY formatındaki tarihi JS Date objesine çevirir
+// Yardımcı: Tarihi JS Date objesine çevirir.
+// HTML <input type="date"> tarayıcıda GG.AA.YYYY gösterse bile her zaman YYYY-MM-DD gönderir.
+// DD.MM.YYYY formatı da (elle girilirse) desteklenir, ikisi de kabul edilir.
 function turkceTarihiParseEt(tarihStr) {
     if (!tarihStr) return null;
-    const parcalar = tarihStr.split('.');
-    if (parcalar.length !== 3) return null;
-    const [gun, ay, yil] = parcalar.map(p => parseInt(p, 10));
-    if (!gun || !ay || !yil) return null;
-    return new Date(yil, ay - 1, gun);
+
+    // Önce YYYY-MM-DD formatını dene (HTML date input'un standart formatı)
+    const isoEslesme = tarihStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoEslesme) {
+        const [, yil, ay, gun] = isoEslesme;
+        return new Date(parseInt(yil, 10), parseInt(ay, 10) - 1, parseInt(gun, 10));
+    }
+
+    // Sonra DD.MM.YYYY formatını dene
+    const trEslesme = tarihStr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if (trEslesme) {
+        const [, gun, ay, yil] = trEslesme;
+        return new Date(parseInt(yil, 10), parseInt(ay, 10) - 1, parseInt(gun, 10));
+    }
+
+    return null;
 }
 
 // Yardımcı: "HH:MM" formatındaki saati dakikaya çevirir (basit karşılaştırma için)
@@ -275,7 +288,7 @@ app.post('/api/book-appointment', async (req, res) => {
         // ⭐ GEÇMİŞ TARİH KONTROLÜ
         const girilenTarih = turkceTarihiParseEt(randevuTarihi);
         if (!girilenTarih) {
-            return res.status(422).json({ success: false, message: "Tarih formatı geçersiz. Beklenen format: GG.AA.YYYY" });
+            return res.status(422).json({ success: false, message: "Tarih formatı geçersiz. Beklenen format: YYYY-AA-GG veya GG.AA.YYYY" });
         }
 
         const bugun = new Date();
