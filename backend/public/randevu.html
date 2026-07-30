@@ -42,13 +42,10 @@
         </div>
 
         <div class="form-group">
-            <label>✂️ Hizmet Türü</label>
-            <input type="text" id="hizmetTuru" placeholder="Örn: Saç Kesimi, Sakal Tıraşı">
-        </div>
-
-        <div class="form-group">
-            <label>💰 Hizmet Ücreti (₺)</label>
-            <input type="number" id="ucret" placeholder="Örn: 350" min="0" step="0.01">
+            <label>✂️ Hizmet Seçin</label>
+            <select id="hizmetTuru" required>
+                <option value="">Yükleniyor...</option>
+            </select>
         </div>
 
         <div class="form-group">
@@ -144,13 +141,35 @@
         }
     }
 
+    async function loadServices() {
+        const selectEl = document.getElementById('hizmetTuru');
+        try {
+            const res = await fetch(`/api/hizmetler/${dukkanSlug}`);
+            const data = await res.json();
+
+            if (data.success && data.hizmetler && data.hizmetler.length > 0) {
+                selectEl.innerHTML = '';
+                data.hizmetler.forEach(h => {
+                    const opt = document.createElement('option');
+                    opt.value = h.hizmet_adi;
+                    opt.innerText = `${h.hizmet_adi} - ${h.ucret}₺`;
+                    selectEl.appendChild(opt);
+                });
+            } else {
+                selectEl.innerHTML = '<option value="">Bu işletme henüz hizmet eklemedi</option>';
+            }
+        } catch (e) {
+            console.error("Hizmetler yüklenirken hata:", e);
+            selectEl.innerHTML = '<option value="">Hizmetler yüklenemedi</option>';
+        }
+    }
+
     document.getElementById('appointmentForm').addEventListener('submit', async (e) => {
         e.preventDefault();
 
         const musteriAdi = document.getElementById('musteriAdi').value;
         const musteriTelefon = document.getElementById('musteriTelefon').value;
         const hizmetTuru = document.getElementById('hizmetTuru').value;
-        const ucret = document.getElementById('ucret').value;
         const randevuTarihi = document.getElementById('randevuTarihi').value;
         const randevuSaati = document.getElementById('randevuSaati').value;
 
@@ -163,7 +182,6 @@
                     musteriAdi,
                     musteriTelefon,
                     hizmetTuru: hizmetTuru || null,
-                    ucret: ucret ? parseFloat(ucret) : null,
                     randevuTarihi,
                     randevuSaati
                 })
@@ -184,6 +202,7 @@
     });
 
     loadShopDetails();
+    loadServices();
 </script>
 </body>
 </html>
