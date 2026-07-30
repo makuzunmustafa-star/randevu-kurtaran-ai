@@ -641,33 +641,6 @@ app.post('/api/find-my-panel', async (req, res) => {
     }
 });
 
-// ⭐⭐⭐ GEÇİCİ TEMİZLİK ENDPOINT'İ — Tek seferlik kullanım için, işiniz bitince BU BLOĞU SİLİN ⭐⭐⭐
-app.get('/api/temizlik/isletme-sil/:slug', async (req, res) => {
-    try {
-        const gizliAnahtar = req.query.anahtar;
-        if (gizliAnahtar !== 'feyzanur2026temizlik') {
-            return res.status(403).send('❌ Yetkisiz erişim.');
-        }
-
-        const silinecekSlug = req.params.slug.trim().toLowerCase();
-
-        const dukkanKontrol = await pool.query('SELECT name FROM dukkanlar WHERE LOWER(TRIM(slug)) = $1', [silinecekSlug]);
-        if (dukkanKontrol.rows.length === 0) {
-            return res.send(`❌ "${silinecekSlug}" slug'ına sahip bir işletme bulunamadı.`);
-        }
-
-        await pool.query('DELETE FROM randevular WHERE LOWER(TRIM(dukkan_slug)) = $1', [silinecekSlug]);
-        await pool.query('DELETE FROM bekleme_listesi WHERE dukkan_slug = $1', [silinecekSlug]);
-        await pool.query('DELETE FROM hizmetler WHERE dukkan_slug = $1', [silinecekSlug]);
-        await pool.query('DELETE FROM dukkanlar WHERE LOWER(TRIM(slug)) = $1', [silinecekSlug]);
-
-        return res.send(`✅ "${dukkanKontrol.rows[0].name}" (${silinecekSlug}) işletmesi ve tüm ilişkili verileri (randevular, bekleme listesi, hizmetler) başarıyla silindi.`);
-    } catch (error) {
-        return res.status(500).send('❌ Hata: ' + error.message);
-    }
-});
-// ⭐⭐⭐ TEMİZLİK ENDPOINT'İ SONU ⭐⭐⭐
-
 // ROTALAR
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/dashboard/:slug', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
