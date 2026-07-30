@@ -518,6 +518,53 @@ app.post('/api/cancel-appointment', async (req, res) => {
     }
 });
 
+// ⭐ API: PANEL LİNKİMİ/SLUG'IMI UNUTTUM (telefon numarasıyla SMS ile hatırlatma)
+app.post('/api/find-my-panel', async (req, res) => {
+    try {
+        const { phone } = req.body;
+        if (!phone) {
+            return res.status(400).json({ success: false, message: "Telefon numarası zorunludur." });
+        }
+
+        if (!telefonGecerliMi(phone)) {
+            return res.status(422).json({ success: false, message: "Geçersiz telefon numarası formatı." });
+        }
+
+        const phoneE164 = telefonuE164Yap(phone);
+
+        // Veritabanındaki telefonlar farklı formatlarda (05xx, 5xx, +90...) kayıtlı olabilir,
+        // bu yüzden karşılaştırmayı E.164 formatına çevirerek yapıyoruz.
+        const dukkanlarSorgu = await pool.query('SELECT name, slug, phone FROM dukkanlar');
+        const eslesenler = dukkanlarSorgu.rows.filter(d => telefonuE164Yap(d.phone) === phoneE164);
+
+        if (eslesenler.length === 0) {
+            return res.status(404).json({ success: false, message: "Bu telefon numarasına kayıtlı bir işletme bulunamadı." });
+        }
+
+        if (!twilioClient) {
+            return res.status(503).json({ success: false, message: "SMS servisi şu anda aktif değil, lütfen daha sonra tekrar deneyin." });
+        }
+
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const linkSatirlari = eslesenler.map(d => `${d.name}: ${baseUrl}/dashboard/${d.slug}`).join('\n');
+        const mesajIcerigi = `🔑 Randevu Kurtaran Panel Linkleriniz:\n\n${linkSatirlari}\n\nPanel şifrenizi unuttuysanız işletmenizle iletişime geçin.`;
+
+        try {
+            await twilioClient.messages.create({
+                body: mesajIcerigi,
+                from: TWILIO_PHONE_NUMBER,
+                to: phoneE164
+            });
+            return res.json({ success: true, message: "✅ Panel linkiniz SMS ile telefonunuza gönderildi." });
+        } catch (err) {
+            console.error('❌ SMS gönderim hatası (panel hatırlatma):', err.message);
+            return res.status(500).json({ success: false, message: "SMS gönderilirken bir hata oluştu." });
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 // ROTALAR
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/dashboard/:slug', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
@@ -530,7 +577,6 @@ app.get('/:slug', (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} üzerinde yayında.`));
-
 
 
 
