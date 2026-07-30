@@ -113,6 +113,17 @@ async function tabloyuHazirla() {
             );
         `);
 
+        // ⭐ Hizmetler tablosu (işletmenin sunduğu hizmetler ve fiyatları)
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS hizmetler (
+                id SERIAL PRIMARY KEY,
+                dukkan_slug VARCHAR(255) NOT NULL,
+                hizmet_adi VARCHAR(255) NOT NULL,
+                ucret NUMERIC(10, 2) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
         console.log('✅ Canlı PostgreSQL Altyapısı Başarıyla Kuruldu.');
     } catch (err) {
         console.error('❌ Altyapı kurulum hatası:', err.message);
@@ -288,10 +299,62 @@ function saatiDakikayaCevir(saatStr) {
     return (saat || 0) * 60 + (dakika || 0);
 }
 
+// ⭐ API: HİZMET EKLE (Panel, şifre korumalı)
+app.post('/api/hizmetler/:slug', panelYetkisiKontrolEt, async (req, res) => {
+    try {
+        const dukkanSlug = req.dukkanSlug;
+        const { hizmetAdi, ucret } = req.body;
+
+        if (!hizmetAdi || ucret === undefined || ucret === null || isNaN(parseFloat(ucret)) || parseFloat(ucret) <= 0) {
+            return res.status(400).json({ success: false, message: "Hizmet adı ve geçerli bir ücret (0'dan büyük) zorunludur." });
+        }
+
+        const eklenen = await pool.query(
+            'INSERT INTO hizmetler (dukkan_slug, hizmet_adi, ucret) VALUES ($1, $2, $3) RETURNING id',
+            [dukkanSlug, hizmetAdi.trim(), parseFloat(ucret)]
+        );
+
+        res.json({ success: true, message: "Hizmet eklendi.", id: eklenen.rows[0].id });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ⭐ API: HİZMETLERİ LİSTELE (Herkese açık — müşteri tarafı bunu kullanacak)
+app.get('/api/hizmetler/:slug', async (req, res) => {
+    try {
+        const dukkanSlug = req.params.slug ? req.params.slug.trim().toLowerCase() : '';
+        const liste = await pool.query(
+            'SELECT id, hizmet_adi, ucret FROM hizmetler WHERE dukkan_slug = $1 ORDER BY hizmet_adi ASC',
+            [dukkanSlug]
+        );
+        res.json({ success: true, hizmetler: liste.rows });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ⭐ API: HİZMET SİL (Panel, şifre korumalı)
+app.delete('/api/hizmetler/:slug/:id', panelYetkisiKontrolEt, async (req, res) => {
+    try {
+        const dukkanSlug = req.dukkanSlug;
+        const { id } = req.params;
+
+        const silinen = await pool.query('DELETE FROM hizmetler WHERE id = $1 AND dukkan_slug = $2 RETURNING id', [id, dukkanSlug]);
+        if (silinen.rows.length === 0) {
+            return res.status(404).json({ success: false, message: "Hizmet bulunamadı." });
+        }
+
+        res.json({ success: true, message: "Hizmet silindi." });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 // API: RANDEVU KAYDETME
 app.post('/api/book-appointment', async (req, res) => {
     try {
-        const { dukkanSlug, musteriAdi, musteriTelefon, hizmetTuru, ucret, randevuTarihi, randevuSaati } = req.body;
+        const { dukkanSlug, musteriAdi, musteriTelefon, hizmetTuru, randevuTarihi, randevuSaati } = req.body;
         if (!dukkanSlug || !musteriAdi || !musteriTelefon || !randevuTarihi || !randevuSaati) {
             return res.status(400).json({ success: false, message: "Eksik veri. İsim, telefon, tarih ve saat zorunludur." });
         }
@@ -299,6 +362,20 @@ app.post('/api/book-appointment', async (req, res) => {
         // ⭐ TELEFON DOĞRULAMA
         if (!telefonGecerliMi(musteriTelefon)) {
             return res.status(422).json({ success: false, message: "Geçersiz telefon numarası. Lütfen 5XX XXX XX XX formatında bir cep telefonu numarası girin." });
+        }
+
+        const temizSlug = dukkanSlug.trim().toLowerCase();
+
+        // ⭐ ÜCRETİ SUNUCU TARAFINDA BUL (müşterinin fiyatı değiştirmesini engeller)
+        let gercekUcret = null;
+        if (hizmetTuru) {
+            const hizmetSorgu = await pool.query(
+                'SELECT ucret FROM hizmetler WHERE dukkan_slug = $1 AND hizmet_adi = $2',
+                [temizSlug, hizmetTuru]
+            );
+            if (hizmetSorgu.rows.length > 0) {
+                gercekUcret = hizmetSorgu.rows[0].ucret;
+            }
         }
 
         // ⭐ GEÇMİŞ TARİH KONTROLÜ
@@ -318,7 +395,6 @@ app.post('/api/book-appointment', async (req, res) => {
         }
 
         // ⭐ ÇAKIŞMA KONTROLÜ (aynı dükkan + aynı tarih + aynı saat, aktif randevular arasında)
-        const temizSlug = dukkanSlug.trim().toLowerCase();
         const cakismaSorgu = await pool.query(
             "SELECT id FROM randevular WHERE LOWER(TRIM(dukkan_slug)) = $1 AND randevu_tarihi = $2 AND randevu_saati = $3 AND durum = 'AKTIF'",
             [temizSlug, randevuTarihi, randevuSaati]
@@ -329,7 +405,7 @@ app.post('/api/book-appointment', async (req, res) => {
 
         await pool.query(
             'INSERT INTO randevular (dukkan_slug, musteri_adi, musteri_telefon, hizmet_turu, ucret, randevu_tarihi, randevu_saati) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-            [temizSlug, musteriAdi, musteriTelefon || null, hizmetTuru || null, ucret || null, randevuTarihi, randevuSaati]
+            [temizSlug, musteriAdi, musteriTelefon, hizmetTuru || null, gercekUcret, randevuTarihi, randevuSaati]
         );
         res.json({ success: true, message: "🎉 Randevunuz başarıyla alındı! Yapay zeka koltuğunuzu ayırdı." });
     } catch (error) {
